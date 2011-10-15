@@ -1,0 +1,31 @@
+application: messenger
+version: 0-0-0-1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /favicon\.ico
+  static_files: favicon.ico
+  upload: favicon\.ico
+  mime_type: image/vnd.microsoft.icon
+  expiration: 365d
+- url: /notification\.mp3
+  static_files: notification.mp3
+  upload: notification\.mp3
+  mime_type: audio/mpeg
+  expiration: 365d
+- url: /converse\.js
+  static_files: converse.js
+  upload: converse\.js
+  mime_type: text/javascript
+- url: /converse\.css
+  static_files: converse.css
+  upload: converse\.css
+  mime_type: text/css
+- url: /
+  static_files: homepage.html
+  upload: homepage\.html
+  mime_type: text/html
+  expiration: 365d
+- url: .*
+  script: main.py

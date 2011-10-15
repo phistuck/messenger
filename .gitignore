@@ -1,0 +1,11 @@
+*.pyc
+*.pyo
+.svn
+*.exe
+*.pem
+compiler.jar
+build_scripts/generated
+converse.min.js
+converse.previous.js
+converse.map.js
+messenger/configuration.py

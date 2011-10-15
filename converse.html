@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html dir="ltr" data-channel-name="{{ channel_name }}">
+ <head>
+  <title>Blank</title>
+  <link href="/converse.css" rel="stylesheet" type="text/css"/>
+  </style>
+ </head>
+ <body>
+  <form action="/send-message" method="post">
+   <a href="/sign-out">Sign out</a>
+   <input type="hidden" name="test" value="{{ test }}"/>
+   <input type="hidden" name="manage" value="{{ manage }}"/>
+   <input type="hidden" name="from" value="{{ user }}"/>
+   <input type="hidden" name="to" value="{{ to }}"/>
+   <input autofocus="autofocus" autocomplete="off" type="text"
+          name="content" placeholder="Enter your message..."/><br/>
+   {{ status }}
+   <div id="error"></div>
+   <!--<select id="canned-message"></select><br/>-->
+   <input type="checkbox" name="notify"/> Notify<br/>
+   <input type="submit" value="Post"/>
+  </form>
+  <button onclick="confirmRead();">Confirm read</button>
+  <div id="receptor">
+  </div>
+  {% for message in messages %}{{ message|safe }}{% endfor %}
+  <script type="text/javascript" src="/_ah/channel/jsapi"></script>
+  <script type="text/javascript" src="/converse.js?{{ application_version }}"></script>
+ </body>
+</html>
