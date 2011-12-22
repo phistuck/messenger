@@ -1,0 +1,370 @@
+@charset "UTF-8";
+.connection-state
+{
+ display: none;
+}
+#new-messages-arrow
+{
+ background: url("/images/new-messages-arrow.gif") 50% 50% no-repeat;
+ width: 100%;
+ height: 60px;
+ pointer-events: none;
+ position: fixed;
+ top: 100px;
+ margin: 0 auto;
+ display: none;
+}
+BODY.show-arrow #new-messages-arrow
+{
+ display: inline-block;
+}
+BODY.offline-mode .connection-state
+{
+ display: inline-block;
+ background: red;
+ color: black;
+ -webkit-border-radius: 5px;
+ -moz-border-radius: 5px;
+ border-radius: 5px;
+ padding: 2px;
+}
+BODY, TEXTAREA, INPUT
+{
+ font-family: Arial, sans-serif;
+}
+TEXTAREA, SELECT
+{
+ background-color: transparent;
+}
+TEXTAREA, BUTTON, INPUT[type="button"], INPUT[type="submit"], SELECT
+{
+ -webkit-border-radius: 6px;
+ -moz-border-radius: 6px;
+ border-radius: 6px;
+ border: 1px #d3d3d3 solid;
+}
+A
+{
+ color: blue;
+ text-decoration: none;
+}
+.hidden
+{
+ display: none;
+}
+/*BODY.new-messages
+{
+ background: yellow;
+}*/
+BODY.typing FORM TEXTAREA
+{
+ background: url("/images/typing.gif") left bottom no-repeat #ffffb8;
+}
+BODY.new-messages  #refresh-area
+{
+ background: red;
+}
+BODY.new-messages  #refresh-link
+{
+ display: inline-block;
+}
+BODY.concealment
+{
+ visibility: hidden;
+ overflow: hidden;
+}
+#concealed-message
+{
+ border: none;
+ border-radius: 0;
+ background: #ffffe0;
+ color: #ffffe0;
+ height: 100%;
+ outline: 0;
+ overflow: hidden;
+ position: absolute;
+ resize: none;
+ right: 0;
+ top: -30px;
+ visibility: hidden;
+ width: 98%;
+}
+BODY.concealed-typing #concealed-message
+{
+ visibility: visible;
+}
+
+BODY
+{
+ font: normal 0.9em "Arial";
+ margin: 0;
+}
+#error H3, #error H2
+{
+ padding: 0;
+ margin: 0;
+}
+#error H3
+{
+ padding: 30px 0 0 0;
+}
+#error
+{
+ text-align: center;
+ z-index: 9999;
+ display: none;
+ color: red;
+ position: fixed;
+ top: 20px;
+ bottom: 20px;
+ right: 20px;
+ left: 20px;
+ padding: 10px;
+ background: purple;
+ -webkit-border-radius: 10px;
+ -moz-border-radius: 10px;
+ border-radius: 10px;
+}
+#confirm-read-messages
+{
+ display: none;
+}
+BODY.new-messages #confirm-read-messages
+{
+ display: inline-block;
+}
+.re-enable-notifications
+{
+ display: none;
+}
+BODY.notifications-disabled .re-enable-notifications
+{
+ display: inline-block;
+}
+BODY.no-old-messages .fetch-more-messages
+{
+ display: none;
+}
+.message-pane > .message:first-child
+{
+ border-top: 0;
+}
+.message
+{
+ white-space: pre-wrap;
+ border-top: 1px solid #efefef;
+ background-color: #fafafa;
+ padding: 4px 5px;
+}
+.small-mobile .message
+{
+ padding: 0 5px;
+}
+BODY.new-messages .receptor .message
+{
+ background: pink;
+}
+BODY.new-messages .receptor DIV.m, .m,
+BODY.new-messages .receptor DIV.system-message, .system-message
+{
+ color: gray;
+ font-size: 0.8em;
+ background: #f0f0f0;
+}
+BODY.new-messages .receptor DIV.system-message, .system-message
+{
+ color: red;
+}
+.message-headers
+{
+ font-size: 0.85em;
+ direction: ltr;
+ unicode-bidi: embed;
+}
+.message-field-wrapper INPUT
+{
+ float: right;
+ width: 40px;
+}
+#presence-data A,
+.connection-state
+{
+ float: right;
+}
+#presence-data A:visited IMG,
+#presence-data A:link IMG,
+#presence-data A:active IMG,
+#presence-data A:hover IMG,
+#presence-data A IMG
+{
+ border: 1px #eeeeee outset;
+}
+FORM.messaging-form, #presence-data
+{
+ overflow: hidden;
+ position: absolute;
+ position: fixed;
+ left: 0;
+ right: 0;
+ background: #fff0f5;
+ padding: 0 5px;
+}
+FORM.messaging-form
+{
+ bottom: 0;
+}
+#presence-data, .intro
+{
+ height: 40px;
+ padding-top: 5px;
+}
+.small-mobile #presence-data,
+.small-mobile .intro
+{
+ height: 30px;
+}
+#presence-data
+{
+ top: 0;
+ border-bottom: 1px #d3d3d3 solid;
+ -moz-border-bottom-left-radius: 4px;
+ -moz-border-bottom-right-radius: 4px;
+ -webkit-border-bottom-left-radius: 4px;
+ -webkit-border-bottom-right-radius: 4px;
+ border-bottom-left-radius: 4px;
+ border-bottom-right-radius: 4px;
+ font-size: 0.8em;
+}
+#presence-data IMG
+{
+ vertical-align: middle;
+}
+FORM.messaging-form, .outro
+{
+ height: 90px;
+ padding: 5px 5px 0;
+ -moz-border-top-left-radius: 4px;
+ -moz-border-top-right-radius: 4px;
+ -webkit-border-top-left-radius: 4px;
+ -webkit-border-top-right-radius: 4px;
+ border-top-left-radius: 4px;
+ border-top-right-radius: 4px;
+ border-top: 1px #d3d3d3 solid;
+}
+.outro
+{
+ background-color: transparent;
+ border-top-color: transparent;
+ opacity: 0;
+}
+.fetch-more-messages
+{
+ background: #050505;
+ margin: 3px 3px 0;
+ padding: 10px;
+ -moz-border-radius: 10px;
+ -webkit-border-radius: 10px;
+ border-radius: 10px;
+ text-align: center;
+}
+.fetch-more-messages A
+{
+ color: #ffffff;
+ font-weight: bolder;
+ text-decoration: underline;
+}
+.small-mobile FORM.messaging-form,
+.small-mobile .outro
+{
+ height: 50px;
+}
+#settings A
+{
+ color: white;
+ text-decoration: underline;
+}
+#settings:before
+{
+ width: 10px;
+ height: 12px;
+ right: 37px;
+ position: fixed;
+ content: " ";
+ border-radius: 10px 0 0 0;
+ background: gray;
+ background: rgba(49, 79, 79, 0.9);
+ top: 8px;
+}
+#settings
+{
+ position: absolute;
+ position: fixed;
+ padding: 10px;
+ top: 20px;
+ left: 10px;
+ right: 10px;
+ bottom: 10px;
+ border-radius: 10px;
+ background: gray;
+ background: rgba(49, 79, 79, 0.9);
+ color: white;
+ z-index: 5;
+}
+HTML.desktop-notifications .desktop-notifications
+{
+ display: block;
+}
+.small-mobile #presence-data .location,
+.medium-mobile #presence-data .location
+{
+ font-size: 0.75em;
+}
+#presence-data .online,
+#presence-data .offline
+{
+ display: inline-block;
+ background-position: 50% 50%;
+ background-repeat: no-repeat;
+ width: 11px;
+ height: 11px;
+}
+.online
+{
+ background-image: url("/images/online.png");
+}
+.offline
+{
+ background-image: url("/images/offline.png");
+}
+.message-field-wrapper TEXTAREA,
+.message-field-wrapper INPUT
+{
+ height: 40px;
+}
+.small-mobile .message-field-wrapper TEXTAREA,
+.small-mobile .message-field-wrapper INPUT
+{
+ height: 15px;
+}
+.small-mobile .message-field-wrapper INPUT
+{
+ vertical-align: top;
+ padding: 0;
+ margin: 0;
+ border: 0;
+}
+.small-mobile .canned-message-post-wrapper SELECT,
+.medium-mobile .canned-message-post-wrapper SELECT
+{
+ float: left;
+}
+.small-mobile .notification-toggles,
+.medium-mobile .notification-toggles
+{
+ float: right;
+ font-size: 0.8em;
+}
+.notification-toggles INPUT
+{
+ vertical-align: middle;
+}

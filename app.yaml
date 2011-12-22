@@ -1,31 +1,103 @@
 application: messenger
-version: 0-0-0-1
-runtime: python
+version: 0-0-1-0
+runtime: python27
 api_version: 1
+threadsafe: true
 
 handlers:
-- url: /favicon\.ico
-  static_files: favicon.ico
-  upload: favicon\.ico
-  mime_type: image/vnd.microsoft.icon
-  expiration: 365d
-- url: /notification\.mp3
-  static_files: notification.mp3
-  upload: notification\.mp3
-  mime_type: audio/mpeg
-  expiration: 365d
-- url: /converse\.js
-  static_files: converse.js
-  upload: converse\.js
-  mime_type: text/javascript
-- url: /converse\.css
-  static_files: converse.css
-  upload: converse\.css
-  mime_type: text/css
 - url: /
-  static_files: homepage.html
-  upload: homepage\.html
+  static_files: resources/homepage.html
+  upload: resources/homepage\.html
   mime_type: text/html
   expiration: 365d
+- url: /redirect-to-converse
+  static_files: html/redirect-to-converse.html
+  upload: html/redirect-to-converse\.html
+  mime_type: text/html
+  expiration: 365d
+- url: /notification
+  static_files: html/notification.html
+  upload: html/notification\.html
+  mime_type: text/html
+  expiration: 365d
+- url: /favicon\.ico
+  static_files: images/favicon.ico
+  upload: images/favicon\.ico
+  mime_type: image/vnd.microsoft.icon
+  expiration: 365d
+- url: /resources/notification\.mp3
+  static_files: resources/notification.mp3
+  upload: resources/notification\.mp3
+  mime_type: audio/mpeg
+  expiration: 365d
+- url: /resources/player\.swf
+  static_files: resources/player.swf
+  upload: resources/player\.swf
+  mime_type: application/x-shockwave-flash
+  expiration: 365d
+- url: /scripts/converse\.js
+  static_files: scripts/converse.js
+  upload: scripts/converse\.js
+  mime_type: text/javascript
+- url: /scripts/converse\.min\.js
+  static_files: scripts/converse.min.js
+  upload: scripts/converse\.min\.js
+  mime_type: text/javascript
+- url: /css/converse\.css
+  static_files: css/converse.css
+  upload: css/converse\.css
+  mime_type: text/css
+- url: /images/new-messages-arrow\.gif
+  static_files: images/new-messages-arrow.gif
+  upload: images/new-messages-arrow\.gif
+  mime_type: image/gif
+  expiration: 365d
+- url: /images/typing\.gif
+  static_files: images/typing.gif
+  upload: images/typing\.gif
+  mime_type: image/gif
+  expiration: 365d
+- url: /images/settings\.png
+  static_files: images/settings.png
+  upload: images/settings\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/notifications-disabled\.png
+  static_files: images/notifications-disabled.png
+  upload: images/notifications-disabled\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/sign-out\.png
+  static_files: images/sign-out.png
+  upload: images/sign-out\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/online\.png
+  static_files: images/online.png
+  upload: images/online\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/away\.png
+  static_files: images/away.png
+  upload: images/away\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/offline\.png
+  static_files: images/offline.png
+  upload: images/offline\.png
+  mime_type: image/png
+  expiration: 365d
 - url: .*
-  script: main.py
+  script: main.handler
+  secure: always
+
+inbound_services:
+- xmpp_message
+- xmpp_presence
+- xmpp_subscribe
+- channel_presence
+- mail
+
+builtins:
+- deferred: on
+- remote_api: on

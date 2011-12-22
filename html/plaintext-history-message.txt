@@ -1,0 +1,2 @@
+{% for element in elements %}{% if element.conversation %}Conversation with {{ partner }} that started at {{ element.conversation }}{% else %}
+{% if element.delay %}({{ element.delay }} minutes){% else %}{{ element.hour|safe }} {% if element.sender_or_me %} *{{ element.sender_or_me }}*: {% endif %}{{ element.content|safe }}{% endif %}{% endif %}{% endfor %}

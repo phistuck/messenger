@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+ <head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge; chrome=1"/>
+  <title>Login</title>
+  <style>
+   body { background: #d3d3d3; font: normal 13px Arial; text-align: center; color: #303030; }
+   form .form-content, form .error-content { display: none; }
+   form.form-mode .form-content,
+   form.error-mode .error-content { display: block; }
+  </style>
+  <script>
+   /*jslint sloppy: true, white: true, browser: true*/
+   /*global escape, unescape*/
+   var form;
+   function login(user)
+   {
+    var recipient;
+    if (user === "foo")
+    {
+     recipient = "baz";
+    }
+    else if (user === "baz" || user === "Baz")
+    {
+     user = "baz";
+     recipient = "foo";
+    }
+    if (!recipient)
+    {
+     form.className = "error-mode";
+    }
+    else
+    {
+     if (window.localStorage)
+     {
+      localStorage.user = user;
+     }
+     else
+     {
+      document.cookie = "user=" + escape(user) + "; path=/; max-age=" + 3e7 + ";";
+     }
+     document.location.href = "/converse?from=" + user + "&to=" + recipient;
+    }
+    return false;
+   }
+   function tryAutomaticLogin()
+   {
+    try
+    {
+     var cookie, cookies, user, i, length;
+     if (window.localStorage && localStorage.user)
+     {
+      user = localStorage.user;
+     }
+     else if (document.cookie.indexOf("user=") !== -1)
+     {
+      cookies = document.cookie.split(/\s*;\s*/g);
+      /*jslint plusplus: true*/
+      for (i = 0, length = cookies.length; i < length; i++)
+      {
+      /*jslint plusplus: false*/
+       cookie = cookies[i].split("&");
+       if (cookie[0] === "user")
+       {
+        user = unescape(cookie[1]);
+        break;
+       }
+      }
+     }
+     login(user);
+    }
+    catch (e)
+    {
+    }
+   }
+   window.onload =
+    function ()
+    {
+     function initiateLogin()
+     {
+      setTimeout(
+       function ()
+       {
+        login(form.from.value);
+       },
+       0);
+     }
+     form = document.forms[0];
+     form.from.focus();
+     form.from.onkeypress =
+      function (e)
+      {
+       if (!e)
+       {
+        e = window.event;
+       }
+       if (e.keyCode === 13)
+       {
+        initiateLogin();
+        return false;
+       }
+      };
+     document.getElementById("back").onclick =
+      function submit()
+      {
+       form.className = "form-mode";
+       return false;
+      };
+     document.getElementById("sign-in").onclick =
+      function submit()
+      {
+       initiateLogin();
+       return false;
+      };
+    };
+  </script>
+ </head>
+ <body>
+  <h1>Messenger</h1>
+  <form name="login" class="form-mode">
+   <div class="error-content">
+    There is a problem with the service. Please, try again later.<br/><br/>
+    <a id="back" href="#">&lt;&lt; Back</a>
+   </div>
+   <div class="form-content">
+    <div align="left">Welcome! please, sign in first.</div>
+    <br/><br/>
+    <label>Username<br/>
+    <input autocomplete="off" type="text" name="from" size="10"/></label><br/><br/>
+    <a id="sign-in" href="/">Sign in</a>
+   </div>
+  </form>
+ </body>
+</html>

@@ -1,9 +1,0 @@
-  body { font: normal 1em "Arial"; }
-  input[type="text"] { width: 96%; }
-  #error { color: red; }
-  body { text-align: right; }
-  .new #receptor div { background: pink; }
-  .new #receptor div.m, .m { color: gray; font-size: 0.8em; background: none; }
-  button { display: none; }
-  .new button { display: inline-block; }
-  .message-header { direction: ltr; unicode-bidi: embed; }
