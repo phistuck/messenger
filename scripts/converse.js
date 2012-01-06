@@ -6,6 +6,7 @@
 // @js_externs /** @param {Object} obj */ goog.appengine.Channel.prototype.open = function (obj) {};
 // @js_externs /** @typedef {HTMLAudioElement} */ var Audio;
 // @compilation_level ADVANCED_OPTIMIZATIONS
+// @warning_level VERBOSE
 // ==/ClosureCompiler==
 /*jslint sloppy: true, browser: true, white: true,
          maxerr: 999, maxlen: 80, indent: 1, devel: true*/
@@ -463,6 +464,8 @@ main.statusMessage = main.$.firstTag("div", main.form);
 /** @type {boolean} */
 main.testDatabase = false;
 /** @type {boolean} */
+main.desktop = false;
+/** @type {boolean} */
 main.typing = false;
 /** @type {?string} */
 main.userName = null;
@@ -505,10 +508,13 @@ main.handleGlobalShortcuts =
    }
   }
  };
-main.reply =
+main.focusMessageField =
  function ()
  {
-  main.messageField.focus();
+  if (!main.concealment)
+  {
+   main.messageField.focus();
+  }
  };
 main.updateHTMLIndicator =
  function ()
@@ -798,8 +804,14 @@ main.handleClicks =
    case "remove":
     main.messages.removeMessage.call(source, e);
     break;
+   case "exit-application":
+    main.doc.title = "exit";
+    return false;
    case "settings":
     main.settings.toggleWidget();
+    return false;
+   case "clear-conversation":
+    main.messages.clearAll();
     return false;
    case "fetch-more-messages":
     main.messages.fetch(e);
@@ -925,6 +937,10 @@ main.handleExit =
 main.toggleConcealmentMode =
  function (force)
  {
+  if (!main.concealment)
+  {
+   main.messageField.blur();
+  }
   main.concealment = force || !main.concealment;
   if (!force && main.concealedTyping)
   {
@@ -1033,6 +1049,7 @@ main.initialize =
   main.recipient = get("recipient");
   main.refreshURL = get("current-url");
   main.atWork = get("at-work") === "1";
+  main.desktop = get("desktop") === "1";
   /*jslint sub: true*/
   main.testDatabase = main.form["test"].value === "1";
   /*jslint sub: false*/
@@ -1097,10 +1114,10 @@ main.initialize =
   main.channelToken = get("channel-name");
   main.createChannel();
   /*jslint sub: true*/
-  if (typeof main.$.createElement("input")["autofocus"] === "undefined")
+  if (typeof main.$.createElement("input")["autofocus"] === "undefined" && !main.desktop)
   {
   /*jslint sub: false*/
-   main.reply();
+   main.focusMessageField();
   }
   main.messages.iterateThroughMessages(main.$.linkifyURLs);
  };
@@ -1297,7 +1314,11 @@ main.notifications.show =
   {
    return;
   }
-  if (!main.settings.nativeDesktopNotifications())
+  if (main.desktop)
+  {
+   document.title = "New Message - Notify";
+  }
+  else if (!main.settings.nativeDesktopNotifications())
   {
    notification = main.notifications.notificationPopup;
    if (!notification)
@@ -1507,13 +1528,22 @@ main.messages.sendRequest = null;
 main.messages.sendURL = main.form.action;
 /** @type {RegExp} */
 main.messages.normalHebrewAsEnglishPattern =
- new RegExp("\\b(yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b", "g");
+ new RegExp("\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b", "g");
 /** @type {RegExp} */
 main.messages.whitelistEnglishPattern =
  new RegExp("\\b(h+m+|g+r+|w+t+f+|(http://|www)[^ \"]+)\\b", "g");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
 
+main.messages.clearAll =
+ function ()
+ {
+  main.messages.iterateThroughMessages(
+   function (element)
+   {
+    element.className += " hidden";
+   });
+ };
 main.messages.removeUndelivered =
  function (e, dismissLink)
  {
@@ -1680,9 +1710,17 @@ main.messages.notify =
    main.notifications.showArrow = true;
    main.updateBodyIndicator();
   }
-  if (!main.messages.glowTimer)
+  if (main.desktop)
   {
-   main.messages.glowTimer = setInterval(main.messages.glow, 1000);
+   document.title = "New Message";
+  }
+  else
+  {
+   main.doc.title = "1";
+   if (!main.messages.glowTimer)
+   {
+    main.messages.glowTimer = setInterval(main.messages.glow, 1000);
+   }
   }
   if (main.notifications.enabled)
   {
@@ -1691,7 +1729,6 @@ main.messages.notify =
   }
   main.newMessages = true;
   main.updateBodyIndicator();
-  main.doc.title = "1";
  };
 /** @param {number} index */
 main.messages.saveCannedMessageOrder =
@@ -1728,7 +1765,8 @@ main.messages.send =
  {
   var message = main.messageField.value, parameters, requestTimeout,
       indicateUndeliveredMessage, uniqueID, notify, request, retry = 0,
-      resetTimer, resend, cleanup, sendMessage, stopRequest, translatedMessage;
+      resetTimer, resend, cleanup, sendMessage, stopRequest, translatedMessage,
+      translateDecision, undeliveredTimeout;
   cleanup =
    function ()
    {
@@ -1738,6 +1776,13 @@ main.messages.send =
     }
     request.onreadystatechange = null;
     request.onerror = null;
+    try
+    {
+     request.abort();
+    }
+    catch (e)
+    {
+    }
     request = null;
    };
   resetTimer =
@@ -1848,14 +1893,7 @@ main.messages.send =
   stopRequest =
    function ()
    {
-    try
-    {
-     request.onreadystatechange = null;
-     request.abort();
-    }
-    catch (e)
-    {
-    }
+    cleanup();
     resend();
    };
   if (!message.match(main.messages.onlyHebrewLettersPattern) &&
@@ -1863,17 +1901,25 @@ main.messages.send =
       .match(main.messages.normalHebrewAsEnglishPattern))
   {
    translatedMessage = main.$.translateHebrewToEnglish(message);
-   if (confirm(
-         "Looks like you meant to type in Hebrew. \n" +
-         "Here is what I managed to fix -\n" +
-         translatedMessage +"\n\n" +
-         "Should I send the fixed message?\n\n" +
-         "(Clicking Cancel will send the original message!)"))
+   translateDecision =
+    confirm(
+     "Looks like you meant to type in Hebrew. \n" +
+     "Here is what I managed to fix -\n" +
+     translatedMessage +"\n\n" +
+     "Should I send the fixed message?\n\n" +
+     "(Clicking Cancel will not send the message at all!\n" +
+     "Pressing Escape/clicking on the X button will send the " +
+     "original message!)");
+   if (translateDecision)
    {
     message = translatedMessage;
    }
    else
    {
+    if (translateDecision === false)
+    {
+     return false;
+    }
     main.sendReport("invalid-hebrew-english-detection", message);
    }
   }
@@ -1893,8 +1939,14 @@ main.messages.send =
    (main.testDatabase? "&test=1": "") + "&dynamic=1" +
    "&content=" + (main.$.encode(message) || "");
   sendMessage();
+  undeliveredTimeout = setTimeout(indicateUndeliveredMessage, 33000);
   main.messages.sendMessageCallbacks[uniqueID] =
-   setTimeout(indicateUndeliveredMessage, 33000);
+   function ()
+   {
+    resetTimer();
+    clearTimeout(undeliveredTimeout);
+    main.messages.sendMessageCallbacks[uniqueID] = undefined;
+   };
   main.form.reset();
   return false;
  };
@@ -2088,9 +2140,9 @@ main.messages.addMessage =
        timestamp.getDate() + " " + timestamp.toLocaleTimeString(),
       atScrollBottom = main.$.atScrollBottom(),
       messageContent, receptor = main.messages.receptor;
-  if (uniqueID)
+  if (uniqueID && main.messages.sendMessageCallbacks[uniqueID])
   {
-   clearTimeout(main.messages.sendMessageCallbacks[uniqueID]);
+   main.messages.sendMessageCallbacks[uniqueID]();
   }
   received = form["from"].value !== sender;
   /*jslint sub: false*/
@@ -2223,12 +2275,24 @@ main.messages.removeMessageElement =
    message.parentNode.removeChild(message);
   }
  };
+main.processDesktopCall =
+ function (action)
+ {
+  if (action === "focus")
+  {
+   main.focusMessageField();
+  }
+ };
 main.initialize();
 /*jslint sub: true*/
 window["mainAPI"] = {};
 window["mainAPI"]["dispatchNotificationAction"] = main.dispatchAction;
 window["mainAPI"]["indicateBlockedPopups"] = main.indicateBlockedPopups;
 window["mainAPI"]["hidePopup"] = main.notifications.hide;
+if (main.desktop)
+{
+ window["process"] = main.processDesktopCall;
+}
 /*jslint sub: false*/
 main.$.log("Remember to bring back authorization for Nokia E52!");
 main.$.log("Questions & answers?");

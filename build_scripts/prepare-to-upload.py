@@ -45,6 +45,7 @@ if should_minify:
  print "Cleaning up"
  output.close()
  conn.close
- print "Yay! Go on and upload."
+ print "Done!"
 else:
  print "Nothing to minify!"
+print "Go on and upload."

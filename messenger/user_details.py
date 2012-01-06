@@ -23,6 +23,7 @@ user_list = \
    "real-name": "Bat",
    "nickname": "Third",
    "email": "bat@gmail.com",
+   "email-for-logs": "batlog@gmail.com",
    "default-recipient": "foo",
    "accepted-xmpp-invitation": False
   }

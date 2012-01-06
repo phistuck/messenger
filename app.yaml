@@ -1,5 +1,5 @@
 application: messenger
-version: 0-0-1-0
+version: 0-0-1-1
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -14,7 +14,7 @@ handlers:
   static_files: html/redirect-to-converse.html
   upload: html/redirect-to-converse\.html
   mime_type: text/html
-  expiration: 365d
+  expiration: 1d
 - url: /notification
   static_files: html/notification.html
   upload: html/notification\.html
@@ -56,6 +56,11 @@ handlers:
   static_files: images/typing.gif
   upload: images/typing\.gif
   mime_type: image/gif
+  expiration: 365d
+- url: /images/clear-conversation\.png
+  static_files: images/clear-conversation.png
+  upload: images/clear-conversation\.png
+  mime_type: image/png
   expiration: 365d
 - url: /images/settings\.png
   static_files: images/settings.png

@@ -3,7 +3,7 @@
 #use_library("django", "1.2")
 import os, re, time, webapp2, datetime, logging, json
 from datetime import timedelta, datetime
- 
+
 from google.appengine.api import mail, channel, xmpp, memcache, urlfetch
 from google.appengine.runtime import apiproxy_errors
 from google.appengine.ext import db, deferred
@@ -367,6 +367,8 @@ class ConversePage(webapp2.RequestHandler):
   if not authentication.is_authenticated(self, DEV_MODE):
    return
   development = self.request.get("dev") == "1"
+  desktop = self.request.get("desktop") or "0"
+  mode_desktop = desktop == "1"
   manage = self.request.get("manage") or "0"
   mode_manage = manage == "1"
   user = self.request.get("from")
@@ -403,6 +405,8 @@ class ConversePage(webapp2.RequestHandler):
   variables["manage"] = manage
   variables["messages"] = messages
   variables["dev_mode"] = DEV_MODE
+  variables["desktop"] = desktop
+  variables["desktop_mode"] = mode_desktop
   variables["new_messages_mode"] = len(unread_messages) > 0
   variables["unread_messages"] = unread_messages
   variables["development"] = development  
@@ -533,7 +537,7 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   if not jid in user_details.users:
    return
   (data, xmpp_users_data) = get_data("xmpp-users", {})
-  (data, history_data) = get_data("history-data", {})
+  (data, history_data) = get_data("history-data", {}, data = data)
   (data, users_data) = get_data("users-data", {}, data = data)
   if not jid in xmpp_users_data:
    xmpp_users_data[jid] = \
@@ -643,6 +647,7 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
    disguise_service = True
   if disguise_service:
    send_disguise_message(disguise_service)
+  #logging.info(to_json(data, indent = True))
   set_data(data)
 
 class HandleChannelConnections(webapp2.RequestHandler):
@@ -889,7 +894,6 @@ def create_conversation_log(
    # Remembering the timestamp and sender of the message.
    state["last-timestamp"] = message_timestamp
    state["last-sender"] = message.sender
-
   # TODO - Consolidate this duplicate code...
   if not ongoing and is_ongoing(message_timestamp):
    return_object["last-message"] = message_timestamp
@@ -898,12 +902,14 @@ def create_conversation_log(
   return i == count
 
  more = True
- while more:
+ while more and not timestamp == state["last-timestamp"]:
   more = \
    gather_messages(
     db_util.fetch_messages_for_user(
      test_mode, user, count, timestamp, False, partner = partner,
      last_first = False))
+  if state["last-timestamp"]:
+   timestamp = state["last-timestamp"]
  if state["last-timestamp"]:
   logging.info("state.last-timestamp - " + state["last-timestamp"].ctime());
  logging.info("Done gathering. Gathered " + str(len(elements)) + " messages.")
