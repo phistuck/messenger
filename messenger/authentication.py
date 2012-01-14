@@ -13,20 +13,22 @@ def is_authenticated(self, DEV_MODE):
  response = self.response
  request = self.request
  request_headers = request.headers
- if DEV_MODE and "Nokia" in request_headers["user-agent"]:
-  return True
- response.headers["WWW-Authenticate"] = "Basic realm=LogIn"
+ def deny_access():
+  response.headers["WWW-Authenticate"] = "Basic realm=LogIn"
+  response.set_status(401)
+ #if DEV_MODE and "Nokia" in request_headers["user-agent"]:
+ # return True
  if not "Authorization" in request_headers:
   #logging.info("\n\n\n")
   headerss = "\n"
   for header in request_headers:
    headerss += header + " - " + request_headers[header] + "\n"
   #logging.info("No authorization... " + headerss + "\n" + request.body)
-  response.set_status(401)
+  deny_access()
   return False
  elif has_session(request) and request_headers["Authorization"] == "Basic dTo=":
   return True
  elif request_headers["Authorization"] == "Basic czo=":
   response.headers["Set-Cookie"] = "authenticated=1"
- response.set_status(401)
+  deny_access()
  return False

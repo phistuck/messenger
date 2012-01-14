@@ -72,10 +72,16 @@ if (!main.$)
 }
 
 /** @type {RegExp} */
-main.$.letterPattern = new RegExp("^[^a-zA-Zא-ת]+", "g");
+main.$.letterPattern = new RegExp("^[^a-zא-ת]+", "gi");
 /** @type {RegExp} */
 main.$.urlPattern =
- new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "g");
+ new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "gi");
+/** @type {Array.<RegExp>} */
+main.$.englishLetterPatterns = null;
+/** @type {Array.<RegExp>} */
+main.$.englishSymbolPatterns = null;
+/** @type {RegExp} */
+main.$.parenthesesPattern = new RegExp("[()]", "g");
 
 /** @param {*} message */
 main.$.log =
@@ -148,8 +154,6 @@ main.$.isRTL =
   return letters.length > 0 && letters.charCodeAt(0) > 1487 &&
          letters.charCodeAt(0) < 1515;
  };
-main.$.englishLetterPatterns = null;
-main.$.englishSymbolPatterns = null;
 main.$.translateHebrewToEnglish =
  function (text)
  {
@@ -166,7 +170,7 @@ main.$.translateHebrewToEnglish =
    for (i = 0; i < letterLength; i++)
    {
    /*jslint plusplus: false*/
-    main.$.englishLetterPatterns.push(new RegExp(englishKeys.charAt(i), "g"));
+    main.$.englishLetterPatterns.push(new RegExp(englishKeys.charAt(i), "gi"));
    }
    main.$.englishSymbolPatterns = [];
    /*jslint plusplus: true*/
@@ -192,7 +196,12 @@ main.$.translateHebrewToEnglish =
    text =
     text.replace(main.$.englishSymbolPatterns[i], hebrewSymbolKeys.charAt(i));
   }
-  return text;
+  return text.replace(
+          main.$.parenthesesPattern,
+          function (character)
+          {
+           return character === "("? ")": "(";
+          });
  };
 main.$.findTextNodes =
  function (element, isValidElementFilter, runAction)
@@ -228,7 +237,7 @@ main.$.linkifyURLs =
    },
    function (textNode, containingElement)
    {
-    var i, urls, length, text, html, element;
+    var i, urls, length, text, html, element, url;
     html = text = textNode.nodeValue;
     urls = html.match(main.$.urlPattern);
     if (urls)
@@ -236,11 +245,12 @@ main.$.linkifyURLs =
      /*jslint plusplus: true*/
      for (i = 0, length = urls.length; i < length; i++)
      {
+      url = (urls[i].indexOf("www") === 0? "http://": "") + urls[i];
      /*jslint plusplus: false*/
       html =
        html.replace(
         urls[i],
-        urls[i].link((urls[i].indexOf("www") === 0? "http://": "") + urls[i]));
+        "<a href=\"" + url + "\" target=\"_blank\">" + urls[i] + "</a>");
      }
      if (text !== html)
      {
@@ -396,7 +406,7 @@ main.doc = document;
 /** @type {Element} */
 main.body = main.$.firstTag("body");
 /** @type {Element} */
-main.error = main.$.id("error");
+main.dialog = main.$.id("dialog");
 /** @type {Element} */
 main.form = main.doc.forms["messaging-form"];
 /** @type {Element} */
@@ -624,7 +634,7 @@ main.updateRecipientLocation =
    main.presenceLocation.innerHTML = "";
   }
  };
-main.indicateBlockedPopups =
+main.showBlockedPopupMessage =
  function ()
  {
   main.showDialog(
@@ -706,19 +716,30 @@ main.handleMessage =
   /*jslint sub: true*/
   var data = ((window.JSON && JSON.parse) || eval)(message["data"] || "{}"),
       value = data["value"];
+  //console.log(message.data);
+  /*jslint sub: false*/
   clearTimeout(main.connectivityTimeoutTimer);
   main.lastConnectivitySignalTimestamp = (new Date()).getTime();
-  if (main.settings.offline && !main.settings.waitingForFetch)
+  if (!main.settings.waitingForFetch)
   {
-   main.messages.fetch(null, true);
+   if (data["last-message-timestamp"] &&
+       data["last-message-timestamp"] !== main.lastMessageTimestamp)
+   {
+    main.settings.offline = true;
+    main.updateBodyIndicator();
+   }
+   if (main.settings.offline)
+   {
+    main.messages.fetch(null, true);
+   }
   }
+
+  /*jslint sub: true*/
   switch (data["type"])
   {
    case "dispatch":
-    /*jslint sub: false*/
-    /*jslint sub: true*/
+  /*jslint sub: false*/
     main.dispatchAction(value);
-    /*jslint sub: false*/
     break;
    case "old-messages":
     /*jslint sub: true*/
@@ -769,21 +790,28 @@ main.replaceReceptor =
           newReceptor,
           before? receptor: receptor.nextSibling);
  };
-/** @param {string} html
+/** @param {string|Element} htmlOrElements
     @param {boolean=} alert */
 main.showDialog =
- function (html, alert)
+ function (htmlOrElements, alert)
  {
-  main.error.style.display = "block";
-  main.error.innerHTML =
-   "<h2>" + (alert? "Hey!": "We are having issues!") + "</h2>" +
-   html + "<h3>(Click to dismiss)</h3>";
+  main.dialog.style.display = "block";
+  main.dialog.innerHTML =
+   "<h2>" + (alert? "Hey!": "We are having issues!") + "</h2>";
+  if (typeof htmlOrElements === "string")
+  {
+   main.dialog.innerHTML += htmlOrElements + "<h3>(Click to dismiss)</h3>";
+  }
+  else
+  {
+   main.dialog.appendChild(htmlOrElements);
+  }
  };
-main.clearError =
+main.clearDialog =
  function ()
  {
-  main.error.style.display = "none";
-  main.error.innerHTML = "";
+  main.dialog.style.display = "none";
+  main.dialog.innerHTML = "";
  };
 main.handleClicks =
  function (e)
@@ -797,6 +825,15 @@ main.handleClicks =
   action = source.getAttribute && source.getAttribute("data-action");
   if (!action)
   {
+   /*main.messageField.value =
+    e.target.tagName + " " + e.target.className + " " + e.target.id;
+   main.messages.send();
+   if (e.target.parentNode.className === "message")
+   {
+    main.messageField.value =
+     e.target.parentNode.outerHTML.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    main.messages.send();
+   }*/
    return;
   }
   switch (action)
@@ -1027,7 +1064,7 @@ main.initialize =
    {
     elementTop = parseInt(element.getBoundingClientRect().top, 10);
     formTop = parseInt(form.getBoundingClientRect().top, 10);
-    if (elementTop < formTop)
+    if (elementTop < formTop && 0)
     {
      element.style.height =
       (parseInt(window.getComputedStyle(element, null).height, 10) -
@@ -1068,7 +1105,7 @@ main.initialize =
   main.doc.onclick = main.handleClicks;
   main.doc.onbeforeunload = main.handleExit;
   main.doc.originalTitle = main.doc.title;
-  main.error.onclick = main.clearError;
+  main.dialog.onclick = main.clearDialog;
   window.onerror =
    function ()
    {
@@ -1114,7 +1151,8 @@ main.initialize =
   main.channelToken = get("channel-name");
   main.createChannel();
   /*jslint sub: true*/
-  if (typeof main.$.createElement("input")["autofocus"] === "undefined" && !main.desktop)
+  if (typeof main.$.createElement("input")["autofocus"] === "undefined" &&
+      !main.desktop)
   {
   /*jslint sub: false*/
    main.focusMessageField();
@@ -1136,6 +1174,7 @@ main.loadSettings =
 main.support = {};
 (function ()
  {
+  //var element;
   try
   {
    main.support.storage = window.sessionStorage || window.localStorage;
@@ -1144,6 +1183,9 @@ main.support = {};
   {
    main.support.storage = false;
   }
+  //element = main.$.createElement("div");
+  //element.style.position = "fixed";
+  //main.support.fixedPosition = element.style.position === "fixed";
  }());
 main.support.desktopNotifications = false;
 main.support.nativeDesktopNotifications = false;
@@ -1342,7 +1384,7 @@ main.notifications.show =
     }
     if (blockedPopups)
     {
-     main.indicateBlockedPopups();
+     main.showBlockedPopupMessage();
     }
    }
    notification = main.notifications.notificationPopup;
@@ -1433,7 +1475,6 @@ main.notifications.initialize =
   }
   add("resize");
   add("focus");
-  add("mousemove");
   add("mousemove");
   add("keydown");
  };
@@ -1528,10 +1569,10 @@ main.messages.sendRequest = null;
 main.messages.sendURL = main.form.action;
 /** @type {RegExp} */
 main.messages.normalHebrewAsEnglishPattern =
- new RegExp("\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b", "g");
+ new RegExp("\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b", "gi");
 /** @type {RegExp} */
 main.messages.whitelistEnglishPattern =
- new RegExp("\\b(h+m+|g+r+|w+t+f+|(http://|www)[^ \"]+)\\b", "g");
+ new RegExp("\\b(h+m+|g+r+|w+t+f+|ll|(http://|www)[^ \"]+)\\b", "gi");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
 
@@ -1625,6 +1666,7 @@ main.messages.handleMessageFieldKeyUp =
   if (main.messageField.value.length)
   {
    main.updatePresenceData(true);
+   main.messages.lastTypedMessage = main.messageField.value;
   }
  };
 /** @param {Event} e
@@ -1632,7 +1674,7 @@ main.messages.handleMessageFieldKeyUp =
 main.messages.handleMessageFieldKeys =
  function (e)
  {
-  var concealed = main.concealedMessageField, key,
+  var concealed = main.concealedMessageField, key, mobileEnter,
       message = main.messageField, source;
   /*function cancelMeOnce(e)
   {
@@ -1652,15 +1694,23 @@ main.messages.handleMessageFieldKeys =
   }
   source = e.target || e.srcElement;
   key = e.keyCode;
+
   if (source !== message && source !== concealed)
   {
    return;
   }
+  
+  // Nokia phones apparently have a weird key code for the Enter key,
+  // which is actually shared between several keys (Enter, Backspace and more).
+  // The Enter key has a specific keyIdentifier, so we use that to
+  // know the real Enter key was pressed.
+  mobileEnter = key === 229 && e.keyIdentifier === "MSK";
+
   if (e.altKey && key === 66)
   {
    return false;
   }
-  else if ((key === 13 || (key === 229 && e.keyIdentifier === "MSK")) &&
+  else if ((key === 13 || mobileEnter) &&
            !e.shiftKey)
   {
    if (e.ctrlKey)
@@ -1672,8 +1722,15 @@ main.messages.handleMessageFieldKeys =
     message.value = concealed.value;
     concealed.value = "";
    }
-   // Makes Internet Explorer actually prevent the key down.
-   e.keyCode = 0;
+   if (navigator.userAgent.indexOf("MSIE") !== -1)
+   {
+    // Makes Internet Explorer actually prevent the key down.
+    e.keyCode = 0;
+   }
+   else if (mobileEnter)
+   {
+    main.messageField.value = main.messages.lastTypedMessage;
+   }
    main.$.preventDefault(e);
    //source.onkeypress = cancelMeOnce;
    return main.messages.send();
@@ -1766,7 +1823,8 @@ main.messages.send =
   var message = main.messageField.value, parameters, requestTimeout,
       indicateUndeliveredMessage, uniqueID, notify, request, retry = 0,
       resetTimer, resend, cleanup, sendMessage, stopRequest, translatedMessage,
-      translateDecision, undeliveredTimeout;
+      prepareMessage, showConfirmationBox,
+      /*translateDecision, */undeliveredTimeout;
   cleanup =
    function ()
    {
@@ -1817,7 +1875,7 @@ main.messages.send =
         receptor = main.messages.receptor, element,
         container = main.$.createElement("div", "system-message message");
         container.originalMessage = message;
-        container.notify = notify;
+        container.notify = !!notify;
         header = container.appendChild(
          main.$.createElement(
           "span", null,
@@ -1896,12 +1954,103 @@ main.messages.send =
     cleanup();
     resend();
    };
+  prepareMessage =
+   function ()
+   {
+    notify = main.notifyRecipient.checked? "&notify=on": "";
+    if (!message && !notify)
+    {
+     return false;
+    }
+    /*jslint plusplus: true*/
+    uniqueID = main.channelToken + "-" + (new Date()).getTime();
+    /*jslint plusplus: false*/
+    parameters =
+     "from=" + main.$.encode(main.userName) +
+     "&to=" + main.$.encode(main.recipient) +
+     "&last-message-timestamp=" + main.$.encode(main.lastMessageTimestamp) +
+     notify + "&unique-id=" + main.$.encode(uniqueID) +
+     (main.testDatabase? "&test=1": "") + "&dynamic=1" +
+     "&content=" + (main.$.encode(message) || "");
+    sendMessage();
+    if (message)
+    {
+     undeliveredTimeout = setTimeout(indicateUndeliveredMessage, 33000);
+     main.messages.sendMessageCallbacks[uniqueID] =
+      function ()
+      {
+       resetTimer();
+       clearTimeout(undeliveredTimeout);
+       main.messages.sendMessageCallbacks[uniqueID] = undefined;
+      };
+    }
+    main.form.reset();
+   };
+  showConfirmationBox =
+   function ()
+   {
+    var defaultButton, button, element, focus,
+        activeElement = main.doc.activeElement;
+    focus =
+     function ()
+     {
+      if (activeElement && activeElement.tagName !== "BODY")
+      {
+       activeElement.focus();
+      }
+      else
+      {
+       main.focusMessageField();
+      }
+     };
+    element =
+     main.$.createElement(
+      "small",
+      null,
+      "Looks like you meant to type in Hebrew.");
+     element.appendChild(main.$.createElement("br"));
+     element.appendChild(main.$.createText("Here is what I managed to fix -"));
+     element.appendChild(main.$.createElement("br"));
+     element.appendChild(main.$.createText(translatedMessage));
+     element.appendChild(main.$.createElement("br"));
+    defaultButton =
+     element.appendChild(main.$.createElement("button", null, "Fix & Send"));
+    defaultButton.onclick =
+     function ()
+     {
+      main.clearDialog();
+      message = translatedMessage;
+      prepareMessage();
+      focus();
+     };
+    button =
+     element.appendChild(main.$.createElement("button", null, "Just Send"));
+    button.onclick =
+     function ()
+     {
+      main.clearDialog();
+      main.sendReport("invalid-hebrew-english-detection", message);
+      prepareMessage();
+      focus();
+     };
+    button =
+     element.appendChild(main.$.createElement("button", null, "Cancel"));
+    button.onclick =
+     function ()
+     {
+      main.clearDialog();
+      focus();
+     };
+    main.showDialog(element, true);
+    defaultButton.focus();
+   };
   if (!message.match(main.messages.onlyHebrewLettersPattern) &&
       message.replace(main.messages.whitelistEnglishPattern, "")
       .match(main.messages.normalHebrewAsEnglishPattern))
   {
    translatedMessage = main.$.translateHebrewToEnglish(message);
-   translateDecision =
+   showConfirmationBox();
+   /*translateDecision =
     confirm(
      "Looks like you meant to type in Hebrew. \n" +
      "Here is what I managed to fix -\n" +
@@ -1920,34 +2069,12 @@ main.messages.send =
     {
      return false;
     }
-    main.sendReport("invalid-hebrew-english-detection", message);
-   }
+   }*/
   }
-  notify = main.notifyRecipient.checked? "&notify=on": "";
-  if (!message && !notify)
+  else
   {
-   return false;
+   prepareMessage();
   }
-  /*jslint plusplus: true*/
-  uniqueID = main.channelToken + "-" + (new Date()).getTime();
-  /*jslint plusplus: false*/
-  parameters =
-   "from=" + main.$.encode(main.userName) +
-   "&to=" + main.$.encode(main.recipient) +
-   "&last-message-timestamp=" + main.$.encode(main.lastMessageTimestamp) +
-   notify + "&unique-id=" + main.$.encode(uniqueID) +
-   (main.testDatabase? "&test=1": "") + "&dynamic=1" +
-   "&content=" + (main.$.encode(message) || "");
-  sendMessage();
-  undeliveredTimeout = setTimeout(indicateUndeliveredMessage, 33000);
-  main.messages.sendMessageCallbacks[uniqueID] =
-   function ()
-   {
-    resetTimer();
-    clearTimeout(undeliveredTimeout);
-    main.messages.sendMessageCallbacks[uniqueID] = undefined;
-   };
-  main.form.reset();
   return false;
  };
 main.messages.useCannedMessage =
@@ -2054,7 +2181,14 @@ main.messages.fetch =
   }
   request.open("get", url, true);
   request.send({});
+  setTimeout(
+   function ()
+   {
+    main.settings.waitingForFetch = false;
+   },
+   10000);
   main.settings.waitingForFetch = true;
+  main.focusMessageField();
  };
 /** @param {Array} messageList
     @param {string} firstMessageTimestamp */
@@ -2180,25 +2314,43 @@ main.messages.addMessage =
   }
   messageContent.innerHTML = content;
   main.$.linkifyURLs(messageContent);
+  // This is a previous message.
   if (old)
   {
+   // Previous messages go to the previous message receptor.
    receptor = main.messages.olderMessageReceptor;
   }
+  // This message was sent by the current user
+  // and no other message was recieved yet.
   else if (!received &&
-           (receptor.children.length > 0 ||
-            main.messages.offlineReceptor.children.length > 0))
+           !receptor.children.length &&
+           !main.messages.offlineReceptor.children.length)
   {
+   // Inserting the message above the receptor.
    main.messages.messagePane.insertBefore(message, receptor);
-  }
-  else if (main.settings.offline)
-  {
-   receptor = main.messages.offlineReceptor;
-  }
-  else
-  {
+   // Removing the reference to the receptor in order not to add to it.
+   receptor = null;
+   // Setting the last message timestamp.
    main.lastMessageTimestamp = accurateTimestamp;
   }
-  receptor.appendChild(message);
+  // We are offline.
+  else if (main.settings.offline)
+  {
+   // New messages in offline mode go to the offline receptor.
+   receptor = main.messages.offlineReceptor;
+  }
+  // Normal message.
+  else
+  {
+   // Setting the last message timestamp.
+   main.lastMessageTimestamp = accurateTimestamp;
+  }
+  // The receptor was not reset.
+  if (receptor)
+  {
+   // Add the message to the receptor.
+   receptor.appendChild(message);
+  }
   if (!old)
   {
    if (received && !doNotNotify)
@@ -2287,7 +2439,7 @@ main.initialize();
 /*jslint sub: true*/
 window["mainAPI"] = {};
 window["mainAPI"]["dispatchNotificationAction"] = main.dispatchAction;
-window["mainAPI"]["indicateBlockedPopups"] = main.indicateBlockedPopups;
+window["mainAPI"]["indicateBlockedPopups"] = main.showBlockedPopupMessage;
 window["mainAPI"]["hidePopup"] = main.notifications.hide;
 if (main.desktop)
 {

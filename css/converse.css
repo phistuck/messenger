@@ -1,4 +1,15 @@
 @charset "UTF-8";
+HTML
+{
+ scrollbar-3dlight-color: #fff0f5;
+ scrollbar-arrow-color: #000000;
+ scrollbar-base-color: #fff0f5;
+ scrollbar-darkshadow-color: #fff0f5;
+ scrollbar-face-color: #d0d0d0;
+ scrollbar-highlight-color: #fff0f5;
+ scrollbar-shadow-color: #fff0f5;
+ scrollbar-track-color: #fff0f5;
+}
 .connection-state
 {
  display: none;
@@ -76,6 +87,8 @@ BODY.concealment
 #concealed-message
 {
  border: none;
+ -webkit-border-radius: 0;
+ -moz-border-radius: 0;
  border-radius: 0;
  background: #ffffe0;
  color: #ffffe0;
@@ -99,16 +112,18 @@ BODY
  font: normal 0.9em "Arial";
  margin: 0;
 }
-#error H3, #error H2
+#dialog H3, #dialog H2
 {
  padding: 0;
  margin: 0;
 }
-#error H3
+#dialog H3, #dialog small
 {
  padding: 30px 0 0 0;
+ display: block;
+ text-align: center;
 }
-#error
+#dialog
 {
  text-align: center;
  z-index: 9999;
@@ -152,6 +167,8 @@ BODY.no-old-messages .fetch-more-messages
 .message
 {
  white-space: pre-wrap;
+ word-wrap: break-word;
+ word-break: break-word;
  border-top: 1px solid #efefef;
  background-color: #fafafa;
  padding: 4px 5px;
@@ -262,8 +279,8 @@ FORM.messaging-form, .outro
  background: #050505;
  margin: 3px 3px 0;
  padding: 10px;
- -moz-border-radius: 10px;
  -webkit-border-radius: 10px;
+ -moz-border-radius: 10px;
  border-radius: 10px;
  text-align: center;
 }
@@ -290,6 +307,8 @@ FORM.messaging-form, .outro
  right: 37px;
  position: fixed;
  content: " ";
+ -webkit-border-radius: 10px 0 0 0;
+ -moz-border-radius: 10px 0 0 0;
  border-radius: 10px 0 0 0;
  background: gray;
  background: rgba(49, 79, 79, 0.9);
@@ -304,6 +323,8 @@ FORM.messaging-form, .outro
  left: 10px;
  right: 10px;
  bottom: 10px;
+ -webkit-border-radius: 10px;
+ -moz-border-radius: 10px;
  border-radius: 10px;
  background: gray;
  background: rgba(49, 79, 79, 0.9);

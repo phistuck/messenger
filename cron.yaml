@@ -1,4 +1,4 @@
 cron:
 - description: Sends the conversation history log using e-mail messages.
   url: /send-conversation-history
-  schedule: every day 7:30
+  schedule: every 10 minutes

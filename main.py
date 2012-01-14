@@ -3,7 +3,6 @@
 #use_library("django", "1.2")
 import os, re, time, webapp2, datetime, logging, json
 from datetime import timedelta, datetime
-
 from google.appengine.api import mail, channel, xmpp, memcache, urlfetch
 from google.appengine.runtime import apiproxy_errors
 from google.appengine.ext import db, deferred
@@ -97,6 +96,7 @@ def send_chat_message(jid, content, invite = True):
 
 test_mode_channel_prefix = "____test_mode____"
 def send_channel_message(test_mode, recipient, content):
+ logging.info(recipient)
  if test_mode:
   fixed_recipient = (test_mode_channel_prefix + recipient)
  else:
@@ -214,19 +214,23 @@ def send_message(
   message = db_util.save_message(test_mode, user, recipient, content, notify)
   if not content:
    return True
+  (data, users_data) = get_data("users-data", {}, data = data)
+  (data, history_data) = get_data("history-data", {}, data = data)
+  get_set_history_data(data, user, recipient)
+  last_message = history_data[user][recipient]["last-message"]
   message_json = \
    to_json(
     {
      "value": message,
      "accurate-timestamp": message.timestamp.isoformat(),
+     "last-message-timestamp":
+      None if last_message == timestamp_1999 else last_message.isoformat(),
      "unique-id": unique_id,
      "key": str(message.key()),
      "type": "message"
     })
   send_channel_message(test_mode, recipient, message_json)
   send_channel_message(test_mode, user, message_json)
-  (data, users_data) = get_data("users-data", {}, data = data)
-  (data, history_data) = get_data("history-data", {}, data = data)
   get_set_history_data(
    data, user, recipient, property = "last-message", value = message.timestamp)
   if is_xmpp_user_available(recipient, data = data):
@@ -263,7 +267,7 @@ def convert_coordinates_to_address(location, data = None):
    return ""
 
 def update_presence_state(
- test_mode, user, location, typing, online,
+ test_mode, user, location, typing, online, recipient = None,
  last_read_message_timestamp = None, data = None):
  if user:
   (data, active_users) = get_data("active-users", {}, data = data)
@@ -292,6 +296,19 @@ def update_presence_state(
     user_state["location"] = convert_coordinates_to_address(location, data)
    if online:
     active_users[user] = user_state
+  querier_message_json = None;
+  if recipient:
+   (data, history_data) = get_data("history-data", {}, data = data)
+   get_set_history_data(data, user, recipient);
+   last_message_timestamp = history_data[user][recipient]["last-message"]
+   if not last_message_timestamp == timestamp_1999:
+    querier_message_json = \
+     to_json(
+      {
+       "type": "presence",
+       "value": active_users,
+       "last-message-timestamp": last_message_timestamp.isoformat()
+      })
   set_data(data)
   message_json = \
    to_json(
@@ -300,7 +317,11 @@ def update_presence_state(
      "value": active_users
     })
   for online_user in active_users:
-   send_channel_message(test_mode, online_user, message_json)
+   send_channel_message(
+    test_mode, online_user,
+    message_json
+     if not (querier_message_json and online_user == user)
+     else querier_message_json)
 
 """
  Page classes.
@@ -316,6 +337,7 @@ class UpdatePresenceDataPage(webapp2.RequestHandler):
   update_presence_state(
    self.request.get("test") == 1, self.request.get("from"),
    self.request.get("location") or "", self.request.get("typing") == "1", True,
+   recipient = self.request.get("to") or None,
    last_read_message_timestamp = last_read_message_timestamp)
 
 class ReclaimChannelTokenPage(webapp2.RequestHandler):
@@ -364,6 +386,9 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
 class ConversePage(webapp2.RequestHandler):
  def get(self):
   secure(self)
+  self.response.headers["Cache-Control"] = "no-cache"
+  self.response.headers["Pragma"] = "no-cache"
+  self.response.headers["Expires"] = "-1"
   if not authentication.is_authenticated(self, DEV_MODE):
    return
   development = self.request.get("dev") == "1"
@@ -487,6 +512,7 @@ class ImportMessageHistory(webapp2.RequestHandler):
 class SendMessagePage(webapp2.RequestHandler):
  def post(self):
   test_mode = self.request.get("test") == "1"
+  static_form_mode = self.request.get("static-form") == "1"
   test = "&test=1" if test_mode else ""
   manage = "&manage=1" if self.request.get("manage") == "1" else ""
   last_read_message_timestamp = \
@@ -509,7 +535,12 @@ class SendMessagePage(webapp2.RequestHandler):
   if last_read_message_timestamp:
    set_data(data)
   status = "Sent." if sent else "Not sent."
-  if not dynamic:
+  if static_form_mode and not sent:
+   self.response.write(
+    "<!doctype html><span style=\"font-family: Arial;\">" +
+    "Oops! Something went wrong and the message was probably not sent. " +
+    "This really sucks. But, do try again! :)</span>");
+  elif not dynamic:
    self.redirect(
     "/converse?from=%s&to=%s%s%s&status=%s" % \
     (user, recipient, test, manage, status))
