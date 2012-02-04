@@ -3,6 +3,7 @@
 #use_library("django", "1.2")
 import os, re, time, webapp2, datetime, logging, json
 from datetime import timedelta, datetime
+
 from google.appengine.api import mail, channel, xmpp, memcache, urlfetch
 from google.appengine.runtime import apiproxy_errors
 from google.appengine.ext import db, deferred
@@ -25,15 +26,20 @@ if os.environ.get("SERVER_SOFTWARE").startswith("Devel"):
  APPLICATION_VERSION = "dev" + str(datetime.now())
 SEND_MESSAGE_PATH = "/send-message"
 SEND_MESSAGE_URL = "https://" + HOST_NAME + SEND_MESSAGE_PATH
+CHANNEL_DURATION = 900
 
 """
  General utility functions and classes.
 """
 
-def secure(self):
+def secure(self, no_cache = False):
  if not DEV_MODE:
   self.response.headers["Strict-Transport-Security"] = \
    "max-age=500; includeSubdomains"
+ if no_cache:
+  self.response.headers["Cache-Control"] = "no-cache"
+  self.response.headers["Pragma"] = "no-cache"
+  self.response.headers["Expires"] = "-1"
 
 def write(self, file_name):
  write(self, file_name, {})
@@ -96,7 +102,7 @@ def send_chat_message(jid, content, invite = True):
 
 test_mode_channel_prefix = "____test_mode____"
 def send_channel_message(test_mode, recipient, content):
- logging.info(recipient)
+ #logging.info(recipient)
  if test_mode:
   fixed_recipient = (test_mode_channel_prefix + recipient)
  else:
@@ -346,7 +352,7 @@ class ReclaimChannelTokenPage(webapp2.RequestHandler):
   user = self.request.get("from")
   if self.request.get("test") == "1":
    user = test_mode_channel_prefix + user
-  self.response.write(channel.create_channel(user))
+  self.response.write(channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
 
 def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object = {}
@@ -385,10 +391,7 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
 
 class ConversePage(webapp2.RequestHandler):
  def get(self):
-  secure(self)
-  self.response.headers["Cache-Control"] = "no-cache"
-  self.response.headers["Pragma"] = "no-cache"
-  self.response.headers["Expires"] = "-1"
+  secure(self, no_cache = True)
   if not authentication.is_authenticated(self, DEV_MODE):
    return
   development = self.request.get("dev") == "1"
@@ -437,7 +440,7 @@ class ConversePage(webapp2.RequestHandler):
   variables["development"] = development  
   variables["channel_name"] = \
    channel.create_channel(
-    user if not test_mode else test_mode_channel_prefix + user)
+    user if not test_mode else test_mode_channel_prefix + user, duration_minutes = CHANNEL_DURATION)
   variables["canned_messages"] = canned_messages.list;
   variables["application_version"] = APPLICATION_VERSION;
   variables["first_message_timestamp"] = message_timestamp_offsets["first"]
@@ -469,10 +472,10 @@ def import_message_history_import_async(test_mode):
     data["imported-messages"] = 0
    messages_to_import = []
    response = {"content": template.render(create_html_path("history-to-import.json"), {})}
-   logging.info("Got the response.")
+   #logging.info("Got the response.")
    try:
     content = from_json(response["content"])
-    logging.info("Parsed the response.")
+    #logging.info("Parsed the response.")
    except:
     return
    for message in content[u"messages"]:
@@ -483,16 +486,16 @@ def import_message_history_import_async(test_mode):
      db_util.create_message(
       test_mode, content = message[u"content"], sender = message[u"sender"],
       recipient = message[u"recipient"], timestamp = timestamp))
-   logging.info("Appended the messages.")
-   logging.info(len(messages_to_import))
-   logging.info("Saved the data.")
+   #logging.info("Appended the messages.")
+   #logging.info(len(messages_to_import))
+   #logging.info("Saved the data.")
    if len(messages_to_import):
      messages_to_import = messages_to_import[data["imported-messages"] - 1:]
      for i in range (0, 15):
       if not len(messages_to_import):
        break
       messages_to_import[0].put()
-      logging.debug("Saving a message.")
+      #logging.debug("Saving a message.")
       if messages_to_import[0].key():
        messages_to_import.pop(0)
        data["imported-messages"] = data["imported-messages"] + 1
@@ -810,8 +813,8 @@ def create_conversation_log(
  test_mode, user, timestamp, partner = None, detailed = False,
  include_plaintext = False, show_titles = False, ongoing = True,
  single = True):
- logging.info("Creating conversation log between " + user + " and " + partner)
- logging.info("Looking for conversations that started after " + timestamp.ctime())
+ #logging.info("Creating conversation log between " + user + " and " + partner)
+ #logging.info("Looking for conversations that started after " + timestamp.ctime())
  return_object = \
   {
    "log": None,
@@ -830,7 +833,7 @@ def create_conversation_log(
    "conversation-ended": False
   }
  def gather_messages(messages):
-  logging.info("Gathering messages")
+  #logging.info("Gathering messages")
   def is_ongoing(timestamp):
    return datetime.now() - timedelta(minutes = 60) < message_timestamp
 
@@ -841,8 +844,8 @@ def create_conversation_log(
     })
 
   i = 0
-  if len(messages):
-   logging.info("First gathered message has the timestamp of " + messages[0].timestamp.ctime());
+  #if len(messages):
+   #logging.info("First gathered message has the timestamp of " + messages[0].timestamp.ctime());
   for message in messages:
    i = i + 1
    first = False
@@ -941,9 +944,9 @@ def create_conversation_log(
      last_first = False))
   if state["last-timestamp"]:
    timestamp = state["last-timestamp"]
- if state["last-timestamp"]:
-  logging.info("state.last-timestamp - " + state["last-timestamp"].ctime());
- logging.info("Done gathering. Gathered " + str(len(elements)) + " messages.")
+ #if state["last-timestamp"]:
+  #logging.info("state.last-timestamp - " + state["last-timestamp"].ctime());
+ #logging.info("Done gathering. Gathered " + str(len(elements)) + " messages.")
 
  if not len(elements) or not state["last-timestamp"]:
   if detailed:

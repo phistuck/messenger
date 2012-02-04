@@ -18,17 +18,18 @@ def is_authenticated(self, DEV_MODE):
   response.set_status(401)
  #if DEV_MODE and "Nokia" in request_headers["user-agent"]:
  # return True
- if not "Authorization" in request_headers:
+ #if not "Authorization" in request_headers:
   #logging.info("\n\n\n")
-  headerss = "\n"
-  for header in request_headers:
-   headerss += header + " - " + request_headers[header] + "\n"
+  #headerss = "\n"
+  #for header in request_headers:
+  # headerss += header + " - " + request_headers[header] + "\n"
   #logging.info("No authorization... " + headerss + "\n" + request.body)
-  deny_access()
-  return False
- elif has_session(request) and request_headers["Authorization"] == "Basic dTo=":
-  return True
- elif request_headers["Authorization"] == "Basic czo=":
-  response.headers["Set-Cookie"] = "authenticated=1"
-  deny_access()
+  
+ #el
+ if "Authorization" in request_headers:
+  if has_session(request) and request_headers["Authorization"] == "Basic dTo=":
+   return True
+  elif request_headers["Authorization"] == "Basic czo=":
+   response.headers["Set-Cookie"] = "authenticated=1; Max-Age=30;"
+ deny_access()
  return False

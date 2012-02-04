@@ -3,7 +3,13 @@
 // @output_file_name default.js
 // @js_externs var goog = {}; goog.appengine = {};
 // @js_externs /** @constructor @param {string} str */ goog.appengine.Channel = function (str) {};
-// @js_externs /** @param {Object} obj */ goog.appengine.Channel.prototype.open = function (obj) {};
+// @js_externs /** @constructor @param {string} str */ goog.appengine.Socket = function () {};
+// @js_externs goog.appengine.Socket.prototype.close = function () {};
+// @js_externs goog.appengine.Socket.prototype.onclose = function () {};
+// @js_externs goog.appengine.Socket.prototype.onopen = function () {};
+// @js_externs goog.appengine.Socket.prototype.onerror = function () {};
+// @js_externs goog.appengine.Socket.prototype.onmessage = function () {};
+// @js_externs /** @param {Object} obj @return {goog.appengine.Socket} */ goog.appengine.Channel.prototype.open = function (obj) {};
 // @js_externs /** @typedef {HTMLAudioElement} */ var Audio;
 // @compilation_level ADVANCED_OPTIMIZATIONS
 // @warning_level VERBOSE
@@ -73,6 +79,8 @@ if (!main.$)
 
 /** @type {RegExp} */
 main.$.letterPattern = new RegExp("^[^a-zא-ת]+", "gi");
+/** @type {RegExp} */
+main.$.whitespacePatten = new RegExp("\\n\\s\\t\\r", "g");
 /** @type {RegExp} */
 main.$.urlPattern =
  new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "gi");
@@ -413,8 +421,8 @@ main.form = main.doc.forms["messaging-form"];
 main.html = main.doc.documentElement;
 /** @type {string} */
 main.version = "";
-/** @type {goog.appengine.Channel} */
-main.channel = null;
+/** @type {goog.appengine.Socket} */
+main.socket = null;
 /** @type {string} */
 main.channelToken = "";
 /** @type {?boolean} */
@@ -647,18 +655,20 @@ main.updatePresenceData =
  {
   
   var /** @type {XMLHttpRequest|ActiveXObject} */
-      request = main.messages.newRequest,
-      url, now = (new Date()).getTime();
-  if ((indicateTypingState &&
-       (now - main.lastTypingIndicationTimestamp) < 5000))// ||
+      request = main.messages.newRequest, 
+      url, typing = "", now = (new Date()).getTime(),
+      typedLately = (now - main.lastTypingIndicationTimestamp) < 5000;
+  if (indicateTypingState && typedLately)// ||
       //(!indicateTypingState &&
        //(now - main.lastConnectivitySignalTimestamp) < 25000))
   {
    return;
   }
-  if (indicateTypingState)
+  else if ((indicateTypingState || typedLately) &&
+           main.messageField.value.replace(main.$.whitespacePatten, ""))
   {
    main.lastTypingIndicationTimestamp = now;
+   typing = "&typing=1";
   }
   if (request && request.readyState !== 4)
   {
@@ -669,8 +679,7 @@ main.updatePresenceData =
    main.$.encode(main.userName) +
    "&to=" + main.$.encode(main.recipient) +
    "&last-message-timestamp=" + main.$.encode(main.lastMessageTimestamp) +
-   (main.messageField.value.length? "&typing=1": "") +
-   (main.atWork? "&work=1": "") +
+   typing + (main.atWork? "&work=1": "") +
    (main.location? "&location=" + main.$.encode(main.location): "") +
    (main.testDatabase? "&test=1": "") +
    "&now=" + (new Date().getTime());
@@ -888,41 +897,51 @@ main.animateScrollingToTheBottom =
 main.createChannel =
  function ()
  {
-  main.channel = new goog.appengine.Channel(main.channelToken);
-  main.channel.open(
+  var channel = new goog.appengine.Channel(main.channelToken),
+      socket =
+       channel.open(
+        {
+         "onopen":
+          function ()
+          {
+           main.messages.fetch(null, true);
+           main.$.log("open" + Date());
+          }
+        });
+  main.socket = socket;  
+  socket.onclose =
+   function ()
    {
-    onopen:
-     function ()
-     {
-      main.messages.fetch(null, true);
-      main.$.log("open" + Date());
-     },
-    onclose:
-     function ()
-     {
-      main.reclaimToken();
-      main.$.log("close" + Date());
-     },
-    onerror:
-     function ()
-     {
-      main.reclaimToken();
-      main.$.log("error" + Date());
-     },
-    onmessage: main.handleMessage
-   });
+    main.reclaimToken();
+    main.$.log("close" + Date());
+   };
+  socket.onerror =
+   function ()
+   {
+    main.reclaimToken();
+    main.$.log("error" + Date());
+   };
+  socket.onmessage = main.handleMessage;
  };
 main.reclaimToken =
  function ()
  {
-  var iFrame = main.$.firstTag("iframe"), request;
-  if (!iFrame)
+  var /*iFrame = main.$.firstTag("iframe"), */request;
+  /*if (!iFrame)
   {
    main.sendReport("reclaim-token-iframe-deletion", "no-iframe");
   }
   else
   {
    iFrame.parentNode.removeChild(iFrame);
+  }*/
+  try
+  {
+   main.releaseSocket();
+   main.socket.close();
+  }
+  catch (e)
+  {
   }
   request = main.reclaimTokenRequest;
   if (request && request.readyState !== 4)
@@ -968,7 +987,21 @@ main.handleExit =
  function ()
  {
   main.notifications.hide();
-  main.channel.onclose = null;
+  main.releaseSocket();
+ };
+main.releaseSocket =
+ function ()
+ {
+  function f()
+  {
+  }
+  if (main.socket)
+  {
+   main.socket.onclose = f;
+   main.socket.onerror = f;
+   main.socket.onmessage = f;
+   main.socket.onopen = f;
+  }
  };
 /** @param {boolean=} force */
 main.toggleConcealmentMode =
@@ -1064,7 +1097,7 @@ main.initialize =
    {
     elementTop = parseInt(element.getBoundingClientRect().top, 10);
     formTop = parseInt(form.getBoundingClientRect().top, 10);
-    if (elementTop < formTop && 0)
+    if (elementTop < formTop)
     {
      element.style.height =
       (parseInt(window.getComputedStyle(element, null).height, 10) -
@@ -2274,12 +2307,17 @@ main.messages.addMessage =
        timestamp.getDate() + " " + timestamp.toLocaleTimeString(),
       atScrollBottom = main.$.atScrollBottom(),
       messageContent, receptor = main.messages.receptor;
+  /*jslint sub: false*/
+
   if (uniqueID && main.messages.sendMessageCallbacks[uniqueID])
   {
    main.messages.sendMessageCallbacks[uniqueID]();
   }
-  received = form["from"].value !== sender;
-  /*jslint sub: false*/
+  received = main.userName !== sender;
+  if (sender === main.recipient)
+  {
+   main.updateRecipientTyping(-1);
+  }
 
   message = main.$.createElement("div", "message" + (!received? " m": ""));
   message.setAttribute("data-key", key);
