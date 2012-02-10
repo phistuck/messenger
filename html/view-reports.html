@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+ <head>
+  <meta charset="utf-8"/>
+  <title>Reports!</title>
+  <style>
+   body
+   {
+    font: 10pt normal "Arial";
+   }
+   h1
+   {
+    text-align: center;
+   }
+   td
+   {
+    word-break: break-word;
+    word-wrap: word-break;
+    padding: 3px;
+    border: 1px #000 solid;
+   }
+  </style>
+ </head>
+ <body>
+  <h1>Issue Reports</h1>
+  <table>
+   <thead>
+    <tr>
+     <th>Timestamp</th>
+     <th>Type</th>
+     <th>Value</th>
+    </tr>
+   </thead>
+   <tbody>
+{% for report in reports %}
+    <tr>
+     <td>{{ report.timestamp.ctime }}</td>
+     <td>{{ report.type }}</td>
+     <td>{{ report.value }}</td>
+    </tr>
+{% endfor %}
+ </body>
+</html>

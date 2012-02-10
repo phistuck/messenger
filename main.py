@@ -274,7 +274,7 @@ def convert_coordinates_to_address(location, data = None):
 
 def update_presence_state(
  test_mode, user, location, typing, online, recipient = None,
- last_read_message_timestamp = None, data = None):
+ last_read_message_timestamp = None, data = None, thinking = False):
  if user:
   (data, active_users) = get_data("active-users", {}, data = data)
   if (not online) and user in active_users:
@@ -285,7 +285,8 @@ def update_presence_state(
      "timestamp": datetime.now(),
      "location-coordinates": location,
      "location": "",
-     "typing": datetime.now() if typing else 0
+     "typing": datetime.now() if typing else 0,
+     "thinking": False
     }
    if last_read_message_timestamp:
     (data, users_data) = get_data("users-data", {}, data = data)
@@ -300,6 +301,7 @@ def update_presence_state(
      user_state["location"] = previous_user_state["location"]
    else:
     user_state["location"] = convert_coordinates_to_address(location, data)
+   user_state["thinking"] = thinking
    if online:
     active_users[user] = user_state
   querier_message_json = None;
@@ -344,7 +346,8 @@ class UpdatePresenceDataPage(webapp2.RequestHandler):
    self.request.get("test") == 1, self.request.get("from"),
    self.request.get("location") or "", self.request.get("typing") == "1", True,
    recipient = self.request.get("to") or None,
-   last_read_message_timestamp = last_read_message_timestamp)
+   last_read_message_timestamp = last_read_message_timestamp,
+   thinking = self.request.get("thinking") == "1")
 
 class ReclaimChannelTokenPage(webapp2.RequestHandler):
  def get(self):
@@ -352,7 +355,11 @@ class ReclaimChannelTokenPage(webapp2.RequestHandler):
   user = self.request.get("from")
   if self.request.get("test") == "1":
    user = test_mode_channel_prefix + user
-  self.response.write(channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
+  try:
+   self.response.write(
+    channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
+  except apiproxy_errors.OverQuotaError:
+   pass
 
 def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object = {}
@@ -438,9 +445,13 @@ class ConversePage(webapp2.RequestHandler):
   variables["new_messages_mode"] = len(unread_messages) > 0
   variables["unread_messages"] = unread_messages
   variables["development"] = development  
-  variables["channel_name"] = \
-   channel.create_channel(
-    user if not test_mode else test_mode_channel_prefix + user, duration_minutes = CHANNEL_DURATION)
+  try:
+   variables["channel_name"] = \
+    channel.create_channel(
+     user if not test_mode else test_mode_channel_prefix + user,
+     duration_minutes = CHANNEL_DURATION)
+  except apiproxy_errors.OverQuotaError:
+   variables["channel_name"] = ""
   variables["canned_messages"] = canned_messages.list;
   variables["application_version"] = APPLICATION_VERSION;
   variables["first_message_timestamp"] = message_timestamp_offsets["first"]
@@ -514,6 +525,7 @@ class ImportMessageHistory(webapp2.RequestHandler):
 
 class SendMessagePage(webapp2.RequestHandler):
  def post(self):
+  save_data = False
   test_mode = self.request.get("test") == "1"
   static_form_mode = self.request.get("static-form") == "1"
   test = "&test=1" if test_mode else ""
@@ -525,17 +537,29 @@ class SendMessagePage(webapp2.RequestHandler):
   unique_id = self.request.get("unique-id") or None
   data = None
   if last_read_message_timestamp:
+   save_data = True
    (data, users_data) = get_data("users-data", {})
    user_data = initialize_user_data(users_data, user)
    user_data["last-read-message-timestamp"] = \
     parse_iso_timestamp(last_read_message_timestamp)
+  (data, active_users) = get_data("active-users", {}, data = data)
+  if user in active_users:
+   user_state = active_users[user]
+   if "thinking" in user_state and user_state["thinking"]:
+    save_data = True
+    user_state["thinking"] = False
+   if user_state["typing"]:
+    save_data = True
+    user_state["typing"] = 0
   recipient = self.request.get("to")
   content = self.request.get("content")
+  if content and static_form_mode:
+   content += "\n(Sent from the static page)"
   notify = self.request.get("notify") == "on"
   sent = send_message( \
    test_mode, dynamic, user, recipient, content, notify,
    data = data, unique_id = unique_id)
-  if last_read_message_timestamp:
+  if save_data:
    set_data(data)
   status = "Sent." if sent else "Not sent."
   if static_form_mode and not sent:
@@ -1107,6 +1131,13 @@ class ReportPage(webapp2.RequestHandler):
   value = self.request.get("value")
   db_util.add_report(test_mode, type, value)
 
+class ViewReportsPage(webapp2.RequestHandler):
+ def get(self):
+  test_mode = self.request.get("test") == "1"
+  count = int(digit_only_pattern.sub("", self.request.get("count")) or 100)
+  reports = db_util.fetch_reports(test_mode, count)
+  write(self, "view-reports.html", {"reports": reports})   
+
 class PrintMemcachePage(webapp2.RequestHandler):
  def get(self):
   self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
@@ -1145,6 +1176,7 @@ handler = webapp2.WSGIApplication(
   ("/print-memcache", PrintMemcachePage),
   ("/static-form", StaticFormPage),
   ("/report", ReportPage),
+  ("/view-reports", ViewReportsPage),
   ProcessMailPage.mapping()
  ],
  debug = DEV_MODE)

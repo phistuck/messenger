@@ -147,3 +147,13 @@ def add_report(test_mode, type, value):
  report.type = type
  report.value = value
  report.put()
+ 
+def fetch_reports(test_mode, count):
+ if test_mode:
+  reports = ReportingDatabaseTest()
+ else:
+  reports = ReportingDatabase()
+ reports = reports.all()
+ reports.order("-timestamp")
+ return reports.fetch(count)
+ 

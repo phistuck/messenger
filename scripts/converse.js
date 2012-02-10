@@ -90,6 +90,18 @@ main.$.englishLetterPatterns = null;
 main.$.englishSymbolPatterns = null;
 /** @type {RegExp} */
 main.$.parenthesesPattern = new RegExp("[()]", "g");
+/** @type {string} */
+main.$.addEventString = "addEventListener";
+/** @type {string} */
+main.$.removeEventString = "removeEventListener";
+/** @type {string} */
+main.$.eventTypePrefix = "";
+if (!window.addEventListener && window.attachEvent)
+{
+ main.$.addEventString = "attachEvent";
+ main.$.removeEventString = "detachEvent";
+ main.$.eventTypePrefix = "on";
+}
 
 /** @param {*} message */
 main.$.log =
@@ -450,6 +462,8 @@ main.location = null;
 /*jslint sub: true*/
 /** @type {Element} */
 main.messageField = main.form["content"];
+/** @type {Element} */
+main.thinkingButton = main.$.id("thinking");
 /*jslint sub: false*/
 /** @type {boolean} */
 main.newMessages = false;
@@ -465,6 +479,14 @@ main.presenceIndication = main.$.id("presence-data");
 main.presenceLocation = main.$.tag("span", main.presenceIndication)[1];
 /** @type {Element} */
 main.presenceStatus = main.$.firstTag("span", main.presenceIndication);
+/** @type {number} */
+main.pingInterval = 30000;
+/** @type {boolean} */
+main.thinking = false;
+/** @type {number} */
+main.channelCount = 1;
+/** @type {number} */
+main.channelCountStartTime = (new Date()).getTime();
 /** @type {string} */
 main.recipient = "";
 /** @type {Element} */
@@ -485,9 +507,18 @@ main.testDatabase = false;
 main.desktop = false;
 /** @type {boolean} */
 main.typing = false;
+/** @type {boolean} */
+main.recipientThinking = false;
 /** @type {?string} */
 main.userName = null;
 
+main.toggleThinkingMode =
+ function ()
+ {
+  main.thinking = !main.thinking;
+  main.updatePresenceData();
+  main.thinkingButton.className = main.thinking? "activated": "";
+ }
 /** @param {Event} e */
 main.handleGlobalShortcuts =
  function (e)
@@ -510,6 +541,10 @@ main.handleGlobalShortcuts =
   else if (main.newMessages && key === 113)
   {
    main.messages.confirmRead();
+  }
+  else if (key === 119)
+  {
+   main.toggleThinkingMode();
   }
   // Ctrl+Alt+s toggles message typing mode.
   else if (main.concealment && key === 83 && alt && e.ctrlKey)
@@ -586,6 +621,10 @@ main.updateBodyIndicator =
    {
     classList.push("show-arrow");
    }
+   if (main.recipientThinking)
+   {
+    classList.push("thinking");
+   }
   }
   main.body.className = classList.join(" ");
  };
@@ -627,6 +666,15 @@ main.updateRecipientTyping =
   if (typing)
   {
    main.recipientTypingTimeoutTimer = setTimeout(updateTyping, 8000);
+  }
+ };
+main.updateRecipientThinking =
+ function (thinking)
+ {
+  if (main.recipientThinking !== thinking)
+  {
+   main.recipientThinking = thinking;
+   main.updateBodyIndicator();
   }
  };
 /** @param {?string} presenceLocation */
@@ -676,10 +724,9 @@ main.updatePresenceData =
   }
   url =
    main.messages.updatePresenceDataURL + "?from=" +
-   main.$.encode(main.userName) +
-   "&to=" + main.$.encode(main.recipient) +
+   main.$.encode(main.userName) + "&to=" + main.$.encode(main.recipient) +
    "&last-message-timestamp=" + main.$.encode(main.lastMessageTimestamp) +
-   typing + (main.atWork? "&work=1": "") +
+   (main.thinking? "&thinking=1": "") + typing + (main.atWork? "&work=1": "") +
    (main.location? "&location=" + main.$.encode(main.location): "") +
    (main.testDatabase? "&test=1": "") +
    "&now=" + (new Date().getTime());
@@ -779,6 +826,7 @@ main.updatePresence =
  {
   /*jslint sub: true*/
   var recipientData = data[main.recipient];
+  main.updateRecipientThinking(recipientData? recipientData["thinking"]: false);
   main.updateRecipientStatus(recipientData? recipientData["timestamp"]: 0);
   main.updateRecipientLocation(recipientData? recipientData["location"]: "");
   main.updateRecipientTyping(recipientData? recipientData["typing"]: 0);
@@ -815,12 +863,25 @@ main.showDialog =
   {
    main.dialog.appendChild(htmlOrElements);
   }
+  main.doc[main.$.addEventString](
+   main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
+/** @param {Event|KeyboardEvent|MouseEvent=} e */
 main.clearDialog =
- function ()
+ function (e)
  {
+  if (!e)
+  {
+   e = window.event;
+  }
+  if (e && e.type === "keyup" && e.keyCode !== 27)
+  {
+   return;
+  }
   main.dialog.style.display = "none";
   main.dialog.innerHTML = "";
+  document[main.$.removeEventString](
+   main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
 main.handleClicks =
  function (e)
@@ -897,17 +958,29 @@ main.animateScrollingToTheBottom =
 main.createChannel =
  function ()
  {
-  var channel = new goog.appengine.Channel(main.channelToken),
-      socket =
-       channel.open(
-        {
-         "onopen":
-          function ()
-          {
-           main.messages.fetch(null, true);
-           main.$.log("open" + Date());
-          }
-        });
+  var channel, socket, interval = main.channelToken? 3e4: 3e5;
+
+  if (interval !== main.pingInterval)
+  {
+   main.pingInterval = interval;
+   main.messages.startCheckerTimer();
+  }
+  
+  if (!main.channelToken)
+  {
+   return;
+  }
+  channel = new goog.appengine.Channel(main.channelToken);
+  socket =
+   channel.open(
+    {
+     "onopen":
+      function ()
+      {
+       main.messages.fetch(null, true);
+       main.$.log("open" + Date());
+      }
+    });
   main.socket = socket;  
   socket.onclose =
    function ()
@@ -927,6 +1000,33 @@ main.reclaimToken =
  function ()
  {
   var /*iFrame = main.$.firstTag("iframe"), */request;
+  /*jslint plusplus: true*/
+  if (main.channelCount === 21)
+  {
+   clearInterval(main.messages.checkerTimer);
+   return;
+  }
+  else
+  {
+   if (main.channelCount === 20)
+   {
+    if (((new Date()).getTime() - main.channelCountStartTime) < 54e5)
+    {
+     main.showDialog(
+      "Sorry, your internet connection may be too flaky, " +
+      "which causes us to break over our limits, thus making everyone, " +
+      "everywhere else unhappy. Please, do not refresh...");
+     main.sendReport("too-many-channels", navigator.userAgent);
+    }
+    else
+    {
+     main.channelCount = 1;
+     main.channelCountStartTime = (new Date()).getTime();
+    }
+   }
+   main.channelCount++;
+  }
+  /*jslint plusplus: false*/
   /*if (!iFrame)
   {
    main.sendReport("reclaim-token-iframe-deletion", "no-iframe");
@@ -1068,7 +1168,7 @@ main.initialize =
     if (main.location !== location)
     {
      main.location = location;
-     main.updatePresenceData(false);
+     main.updatePresenceData();
     }
    }
    navigator.geolocation.getCurrentPosition(storeLocation);
@@ -1084,7 +1184,11 @@ main.initialize =
    {
     main.support.screenSize = "medium-mobile";
    }
-   width = documentWidth - 55 - 5;
+   else
+   {
+    main.support.screenSize = "";
+   }
+   width = documentWidth - 75 - 5;
    main.cannedMessageField.style.width = (width - 5) + "px";
    main.messageField.style.width = width  + "px";
    main.updateHTMLIndicator();
@@ -1126,7 +1230,12 @@ main.initialize =
   main.notifications.prepare();
   main.cannedMessageField.onchange = main.messages.useCannedMessage;
   main.messages.confirmReadButton.onclick = main.messages.confirmRead;
-  main.messages.startCheckerTimer();
+  main.thinkingButton.onclick =
+   function ()
+   {
+    main.toggleThinkingMode();
+    return false;
+   };
   main.loadSettings();
   main.messageField.onkeydown = main.messages.handleMessageFieldKeys;
   main.messageField.onkeyup = main.messages.handleMessageFieldKeyUp;
@@ -1183,6 +1292,17 @@ main.initialize =
    };
   main.channelToken = get("channel-name");
   main.createChannel();
+  if (!main.channelToken)
+  {
+   main.showDialog(
+    "We are over the limits... :(<br/>" +
+    "Try again after 10:00 in the morning<br/>" +
+    "Or refresh manually to get new messages.");
+  }
+  else
+  {
+   main.messages.startCheckerTimer();
+  }
   /*jslint sub: true*/
   if (typeof main.$.createElement("input")["autofocus"] === "undefined" &&
       !main.desktop)
@@ -1468,19 +1588,20 @@ main.notifications.hide =
 main.notifications.initialize =
  function ()
  {
-  var addString = "addEventListener", prefix = "";
   function add(type)
   {
-   main.doc[addString](prefix + type, main.notifications.hide, false);
-   window[addString](prefix + type, main.notifications.hide, false);
+   main.doc[main.$.addEventString](
+    main.$.eventTypePrefix + type, main.notifications.hide, false);
+   window[main.$.addEventString](
+    main.$.eventTypePrefix + type, main.notifications.hide, false);
   }
   /** @this {HTMLInputElement} */
   main.settings.form["visual-notification"].onclick =
-  function ()
-  {
-   main.settings.getSetSetting(
-    "visual-notification", "show-popup-notification", this.checked);
-  };
+   function ()
+   {
+    main.settings.getSetSetting(
+     "visual-notification", "show-popup-notification", this.checked);
+   };
   /** @this {HTMLInputElement} */
   main.settings.form["sound-notification"].onclick =
    function ()
@@ -1500,11 +1621,6 @@ main.notifications.initialize =
   if (main.settings.savedSettings.popups)
   {
    main.settings.showNotifications(true);
-  }
-  if (!window.addEventListener && window.attachEvent)
-  {
-   addString = "attachEvent";
-   prefix = "on";
   }
   add("resize");
   add("focus");
@@ -1995,6 +2111,10 @@ main.messages.send =
     {
      return false;
     }
+    if (main.thinking)
+    {
+     main.toggleThinkingMode();
+    }
     /*jslint plusplus: true*/
     uniqueID = main.channelToken + "-" + (new Date()).getTime();
     /*jslint plusplus: false*/
@@ -2134,9 +2254,9 @@ main.messages.useCannedMessage =
 main.messages.startCheckerTimer =
  function ()
  {
+  clearInterval(main.messages.checkerTimer);
   main.messages.checkerTimer =
-   setInterval(main.updatePresenceData, 30000);
-  return false;
+   setInterval(main.updatePresenceData, main.pingInterval);
  };
 /** @this {Element} */
 main.messages.removeMessage =

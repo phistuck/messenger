@@ -71,6 +71,27 @@ BODY.typing FORM TEXTAREA
 {
  background: url("/images/typing.gif") left bottom no-repeat #ffffb8;
 }
+BODY.thinking FORM TEXTAREA
+{
+ background: url("/images/thinking.png") left bottom no-repeat #f3e5ff;
+}
+#thinking
+{
+ padding: 0;
+ text-align: center;
+ margin: 0 1px 0 0;
+ width: 20px;
+ height: 40px;
+ float: right;
+}
+.small-mobile #thinking
+{
+ height: 15px;
+}
+#thinking.activated
+{
+ background: #ffb1ff;
+}
 BODY.new-messages  #refresh-area
 {
  background: red;

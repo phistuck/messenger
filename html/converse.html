@@ -86,16 +86,19 @@
    <input type="hidden" name="manage" value="{{ manage }}"/>
    <input type="hidden" name="from" value="{{ user }}"/>
    <input type="hidden" name="to" value="{{ to }}"/>
-   <div class="message-field-wrapper"><input type="submit"
-        value="Post"/><textarea autofocus="autofocus"
-        autocomplete="off" name="content"
+   <div class="message-field-wrapper"><input type="submit" tabindex="2"
+        value="Post"/><button id="thinking" tabindex="5"
+        title="Thinking mode (F8)"><img width="15" height="15"
+        src="/images/thinking.png"/></button><textarea
+        name="content" autocomplete="off" autofocus="autofocus" tabindex="1"
         placeholder="Enter your message..."></textarea></div>
-   <div class="canned-message-post-wrapper"><select
+   <div class="canned-message-post-wrapper"><select tabindex="4"
         name="canned-message">
      <option></option>{% for message in canned_messages %}
      <option data-index="{{ forloop.counter }}">{{ message }}</option>{% endfor %}
     </select>
-    <div class="notification-toggles"><label><input
+    <div class="notification-toggles"><label><input tabindex="3"
+         title="Notify the recipient using GoogleTalk and an e-mail (Ctrl+Enter)"
          type="checkbox" name="notify"/>Alert</label></div>
    </div>
   </form>
