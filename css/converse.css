@@ -1,4 +1,5 @@
 @charset "UTF-8";
+
 HTML
 {
  scrollbar-3dlight-color: #fff0f5;
@@ -409,4 +410,29 @@ HTML.desktop-notifications .desktop-notifications
 .notification-toggles INPUT
 {
  vertical-align: middle;
+}
+
+::-webkit-scrollbar-button,
+::-webkit-scrollbar,
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece,
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-thumb
+{
+ background-color:  #fff0f5;
+}
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-thumb
+{
+ border: 1px #d3d3d3 solid;
+}
+::-webkit-scrollbar-button
+{
+ background-image: url("/images/up.png");
+ background-position: center center;
+ background-repeat: no-repeat;
+}
+::-webkit-scrollbar-button:end
+{
+ background-image: url("/images/down.png");
 }

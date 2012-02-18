@@ -447,6 +447,8 @@ main.concealedMessageField = main.$.id("concealed-message");
 main.concealedTyping = false;
 /** @type {boolean} */
 main.concealment = false;
+/** @type {boolean} */
+main.wasAtScrollBottom = false;
 /** @type {?string} */
 main.firstMessageTimestamp = null;
 /** @type {?string} */
@@ -518,7 +520,12 @@ main.toggleThinkingMode =
   main.thinking = !main.thinking;
   main.updatePresenceData();
   main.thinkingButton.className = main.thinking? "activated": "";
- }
+ };
+main.scrollToBottom =
+ function ()
+ {
+  window.scroll(0, main.body.scrollHeight);
+ };
 /** @param {Event} e */
 main.handleGlobalShortcuts =
  function (e)
@@ -1107,9 +1114,14 @@ main.releaseSocket =
 main.toggleConcealmentMode =
  function (force)
  {
+  if (main.concealment && force)
+  {
+   return;
+  }
   if (!main.concealment)
   {
    main.messageField.blur();
+   main.wasAtScrollBottom = main.$.atScrollBottom();
   }
   main.concealment = force || !main.concealment;
   if (!force && main.concealedTyping)
@@ -1118,6 +1130,11 @@ main.toggleConcealmentMode =
    main.concealedMessageField.blur();
   }
   main.updateBodyIndicator();
+  if (!main.concealment && main.wasAtScrollBottom)
+  {
+   main.scrollToBottom();
+   main.wasAtScrollBottom = false;
+  }
  };
 main.hideAndFocus =
  function ()
@@ -1284,7 +1301,8 @@ main.initialize =
   window.onload =
    function ()
    {
-    window.scroll(0, main.body.scrollHeight);
+    main.scrollToBottom();
+    
     if (main.$.atScrollBottom())
     {
      hideRedundantOutro();
@@ -1718,10 +1736,11 @@ main.messages.sendRequest = null;
 main.messages.sendURL = main.form.action;
 /** @type {RegExp} */
 main.messages.normalHebrewAsEnglishPattern =
- new RegExp("\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b", "gi");
+ new RegExp(
+  "\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b|[a-zA-Z],[a-zA-Z]", "g");
 /** @type {RegExp} */
 main.messages.whitelistEnglishPattern =
- new RegExp("\\b(h+m+|g+r+|w+t+f+|ll|(http://|www)[^ \"]+)\\b", "gi");
+ new RegExp("\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(http://|www)[^ \"]+)\\b", "gi");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
 

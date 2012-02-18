@@ -1,5 +1,5 @@
 application: messenger
-version: 0-0-1-4
+version: 0-0-1-5
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -65,6 +65,16 @@ handlers:
 - url: /images/thinking\.png
   static_files: images/thinking.png
   upload: images/thinking\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/up\.png
+  static_files: images/up.png
+  upload: images/up\.png
+  mime_type: image/png
+  expiration: 365d
+- url: /images/down\.png
+  static_files: images/down.png
+  upload: images/down\.png
   mime_type: image/png
   expiration: 365d
 - url: /images/settings\.png

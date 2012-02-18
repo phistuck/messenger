@@ -38,14 +38,14 @@ if should_minify:
  conn = httplib.HTTPConnection("closure-compiler.appspot.com")
  conn.request("POST", "/compile", params, headers)
  response = conn.getresponse()
- print "Opening the output file (*.min.js)"
+ print "Opening the output file (*.min.js)."
  output = open(DIR_PATH + r"\..\scripts\converse.min.js","wb")
  print "Writing the minified JavaScript file."
  output.write(response.read())
- print "Cleaning up"
+ print "Cleaning up."
  output.close()
  conn.close
- print "Done!"
+ print "All is done!"
 else:
- print "Nothing to minify!"
+ print "Nothing to minify, all is done!"
 print "Go on and upload."
