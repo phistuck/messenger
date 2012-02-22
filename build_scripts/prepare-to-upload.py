@@ -21,6 +21,11 @@ if should_minify:
  previous_converse_script.write(converse_script_content)
  previous_converse_script.close()
  code = template.render(converse_script_path, {})
+ import re
+ code = \
+  re.sub(
+   "var /* @const */ MAIN_DEBUG = true;",
+   "var /* @const */ MAIN_DEBUG = false;", code)
  externs = template.render(DIR_PATH + r"\..\scripts\externs.js", {})
 
  params = urllib.urlencode(

@@ -51,17 +51,21 @@
     presenceLocation, statusMessage, updatePresenceLocation, isRTL,
     originalChecked, style, direction, handleMessageKeyUp
 */
+var /* @const */ MAIN_DEBUG = true;
 
 /*jslint sub: true*/
-if (!window["console"])
+if (MAIN_DEBUG)
 {
- window["console"] =
-  {
-   "log":
-    function ()
-    {
-    }
-  };
+ if (!window["console"])
+ {
+  window["console"] =
+   {
+    "log":
+     function ()
+     {
+     }
+   };
+ }
 }
 /*jslint sub: false*/
 /** @namespace The main and only global. */
@@ -103,17 +107,20 @@ if (!window.addEventListener && window.attachEvent)
  main.$.eventTypePrefix = "on";
 }
 
-/** @param {*} message */
-main.$.log =
- function (message)
- {
-  /*jslint sub: true*/
-  if (window["debug"])
+if (MAIN_DEBUG)
+{
+ /** @param {*} message */
+ main.$.log =
+  function (message)
   {
-  /*jslint sub: false*/
-   console.log(message);
-  }
- };
+   /*jslint sub: true*/
+   if (window["debug"])
+   {
+   /*jslint sub: false*/
+    console.log(message);
+   }
+  };
+}
 /** @param {string} id
     @return {Element} */
 main.$.id =
@@ -985,7 +992,7 @@ main.createChannel =
       function ()
       {
        main.messages.fetch(null, true);
-       main.$.log("open" + Date());
+       //main.$.log("open" + Date());
       }
     });
   main.socket = socket;  
@@ -993,13 +1000,13 @@ main.createChannel =
    function ()
    {
     main.reclaimToken();
-    main.$.log("close" + Date());
+    //main.$.log("close" + Date());
    };
   socket.onerror =
    function ()
    {
     main.reclaimToken();
-    main.$.log("error" + Date());
+    //main.$.log("error" + Date());
    };
   socket.onmessage = main.handleMessage;
  };
@@ -1130,10 +1137,14 @@ main.toggleConcealmentMode =
    main.concealedMessageField.blur();
   }
   main.updateBodyIndicator();
-  if (!main.concealment && main.wasAtScrollBottom)
+  if (!main.concealment)
   {
-   main.scrollToBottom();
-   main.wasAtScrollBottom = false;
+   if (main.wasAtScrollBottom)
+   {
+    main.scrollToBottom();
+    main.wasAtScrollBottom = false;
+   }
+   resizeFields();
   }
  };
 main.hideAndFocus =
@@ -1265,6 +1276,7 @@ main.initialize =
   main.doc.onbeforeunload = main.handleExit;
   main.doc.originalTitle = main.doc.title;
   main.dialog.onclick = main.clearDialog;
+  main.dialog.ontouchend = main.clearDialog;
   window.onerror =
    function ()
    {
@@ -1740,7 +1752,7 @@ main.messages.normalHebrewAsEnglishPattern =
   "\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b|[a-zA-Z],[a-zA-Z]", "g");
 /** @type {RegExp} */
 main.messages.whitelistEnglishPattern =
- new RegExp("\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(http://|www)[^ \"]+)\\b", "gi");
+ new RegExp("\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(https?://|www)[^ \"]+)\\b", "gi");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
 
@@ -1804,6 +1816,7 @@ main.messages.abortCheckerRequest =
 main.messages.confirmRead =
  function ()
  {
+  var button = main.messages.confirmReadButton;
   if (main.messages.glowTimer)
   {
    main.messages.glowTimer = clearInterval(main.messages.glowTimer);
@@ -1811,9 +1824,15 @@ main.messages.confirmRead =
   main.newMessages = false;
   main.updateBodyIndicator();
   main.notifications.hide();
-  main.messages.confirmReadButton.className = "hidden";
+  button.className = "hidden";
   main.messages.receptor = main.replaceReceptor(main.messages.receptor);
   main.doc.title = main.doc.originalTitle;
+  /*jslint eqeq: true*/
+  if (this === button)
+  {
+  /*jslint eqeq: false*/
+   main.messageField.focus();
+  }
   return false;
  };
 main.messages.glow =
@@ -2497,7 +2516,9 @@ main.messages.addMessage =
    // Previous messages go to the previous message receptor.
    receptor = main.messages.olderMessageReceptor;
   }
-  // This message was sent by the current user
+  // This stupid feature is suspected to have eaten messages.
+  // We cannot really know that no other message was supposed to be received.
+  /*// This message was sent by the current user
   // and no other message was recieved yet.
   else if (!received &&
            !receptor.children.length &&
@@ -2509,7 +2530,7 @@ main.messages.addMessage =
    receptor = null;
    // Setting the last message timestamp.
    main.lastMessageTimestamp = accurateTimestamp;
-  }
+  }*/
   // We are offline.
   else if (main.settings.offline)
   {
@@ -2623,12 +2644,9 @@ if (main.desktop)
  window["process"] = main.processDesktopCall;
 }
 /*jslint sub: false*/
-main.$.log("Remember to bring back authorization for Nokia E52!");
-main.$.log("Questions & answers?");
-main.$.log("Implement the iPhone audio playback workaround?");
-main.$.log(
- "Create an automatic script to minify converse.js " +
- "and upload the whole project.");
-main.$.log("Add a link to the desktop application.");
-//log("Make sure message history import works correctly.");
+if (MAIN_DEBUG)
+{
+ main.$.log("Questions & answers?");
+ main.$.log("Implement the iPhone audio playback workaround?");
+}
 // }());
