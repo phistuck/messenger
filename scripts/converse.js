@@ -51,7 +51,7 @@
     presenceLocation, statusMessage, updatePresenceLocation, isRTL,
     originalChecked, style, direction, handleMessageKeyUp
 */
-var /* @const */ MAIN_DEBUG = true;
+var /** @const */ MAIN_DEBUG = true;
 
 /*jslint sub: true*/
 if (MAIN_DEBUG)
@@ -111,14 +111,9 @@ if (MAIN_DEBUG)
 {
  /** @param {*} message */
  main.$.log =
-  function (message)
+  function (message, message2, message3)
   {
-   /*jslint sub: true*/
-   if (window["debug"])
-   {
-   /*jslint sub: false*/
-    console.log(message);
-   }
+   console.log(message, message2, message3);
   };
 }
 /** @param {string} id
@@ -410,13 +405,6 @@ main.$.save =
    main.$.setCookie(name, value, expiration);
   }
  };
-main.$.atScrollBottom =
- function ()
- {
-  return ((main.body.scrollTop || main.html.scrollTop) +
-          main.html.clientHeight) ===
-         main.html.scrollHeight;
- };
 main.$.preventDefault =
  function (e)
  {
@@ -424,6 +412,18 @@ main.$.preventDefault =
   if (e.preventDefault)
   {
    e.preventDefault();
+  }
+ };
+main.$.scheduleTask =
+ function (task)
+ {
+  if (window.setImmediate)
+  {
+   window.setImmediate(task);
+  }
+  else
+  {
+   setTimeout(task, 0);
   }
  };
 
@@ -528,10 +528,22 @@ main.toggleThinkingMode =
   main.updatePresenceData();
   main.thinkingButton.className = main.thinking? "activated": "";
  };
+main.finishAnimation =
+ function ()
+ {
+  main.$.scheduleTask(
+   function ()
+   {
+    main.animating = false;
+    main.wasAtScrollBottom = true;
+   });
+ };
 main.scrollToBottom =
  function ()
  {
+  main.animating = true;
   window.scroll(0, main.body.scrollHeight);
+  main.finishAnimation();
  };
 /** @param {Event} e */
 main.handleGlobalShortcuts =
@@ -953,6 +965,7 @@ main.animateScrollingToTheBottom =
  function ()
  {
   var currentScroll = -1;
+  main.animating = true;
   function scrollDown()
   {
    var scrollTop = (main.body.scrollTop || main.html.scrollTop);
@@ -965,6 +978,7 @@ main.animateScrollingToTheBottom =
    else
    {
     window.scrollBy(0, 1000);
+    main.finishAnimation();
    }
   }
   scrollDown();
@@ -1128,7 +1142,6 @@ main.toggleConcealmentMode =
   if (!main.concealment)
   {
    main.messageField.blur();
-   main.wasAtScrollBottom = main.$.atScrollBottom();
   }
   main.concealment = force || !main.concealment;
   if (!force && main.concealedTyping)
@@ -1142,9 +1155,9 @@ main.toggleConcealmentMode =
    if (main.wasAtScrollBottom)
    {
     main.scrollToBottom();
-    main.wasAtScrollBottom = false;
+    //main.wasAtScrollBottom = false;
    }
-   resizeFields();
+   main.resizeFields();
   }
  };
 main.hideAndFocus =
@@ -1181,6 +1194,42 @@ main.dispatchAction =
     // break;
   }
  };
+main.resizeFields =
+ function ()
+ {
+  var documentWidth = main.html.clientWidth || (screen.width - 10), width;
+  if (documentWidth < 300)
+  {
+   main.support.screenSize = "small-mobile";
+  }
+  else if (documentWidth < 800)
+  {
+   main.support.screenSize = "medium-mobile";
+  }
+  else
+  {
+   main.support.screenSize = "";
+  }
+  width = documentWidth - 75 - 5;
+  main.cannedMessageField.style.width = (width - 5) + "px";
+  main.messageField.style.width = width  + "px";
+  main.updateHTMLIndicator();
+  if (main.wasAtScrollBottom)
+  {
+   main.scrollToBottom();
+  }
+ };
+main.handleScroll =
+ function ()
+ {
+  if (!main.animating)
+  {
+   main.wasAtScrollBottom =
+    ((main.body.scrollTop || main.html.scrollTop) +
+     main.html.clientHeight) >
+    (main.html.scrollHeight - 5);
+  }
+ };
 main.initialize =
  function ()
  {
@@ -1200,26 +1249,6 @@ main.initialize =
     }
    }
    navigator.geolocation.getCurrentPosition(storeLocation);
-  }
-  function resizeFields()
-  {
-   var documentWidth = main.html.clientWidth || (screen.width - 10), width;
-   if (documentWidth < 300)
-   {
-    main.support.screenSize = "small-mobile";
-   }
-   else if (documentWidth < 800)
-   {
-    main.support.screenSize = "medium-mobile";
-   }
-   else
-   {
-    main.support.screenSize = "";
-   }
-   width = documentWidth - 75 - 5;
-   main.cannedMessageField.style.width = (width - 5) + "px";
-   main.messageField.style.width = width  + "px";
-   main.updateHTMLIndicator();
   }
   function hideRedundantOutro()
   {
@@ -1242,8 +1271,10 @@ main.initialize =
    checkLocation();
    setInterval(checkLocation, 60000);
   }
-  resizeFields();
-  window.onresize = resizeFields;
+  main.resizeFields();
+  window.onresize = main.resizeFields;
+  main.handleScroll();
+  window.onscroll = main.handleScroll;
   main.lastMessageTimestamp = get("last-message-timestamp");
   main.firstMessageTimestamp = get("first-message-timestamp");
   main.newMessages = get("new-messages-mode") === "1";
@@ -1314,8 +1345,8 @@ main.initialize =
    function ()
    {
     main.scrollToBottom();
-    
-    if (main.$.atScrollBottom())
+    main.handleScroll();
+    if (main.wasAtScrollBottom)
     {
      hideRedundantOutro();
     }
@@ -1813,6 +1844,7 @@ main.messages.abortCheckerRequest =
   }
   main.messages.newRequest = null;
  };
+/** @this {HTMLButtonElement} */
 main.messages.confirmRead =
  function ()
  {
@@ -2058,8 +2090,7 @@ main.messages.send =
   indicateUndeliveredMessage =
    function ()
    {
-    var animate = main.$.atScrollBottom(), header, 
-        receptor = main.messages.receptor, element,
+    var header, receptor = main.messages.receptor, element,
         container = main.$.createElement("div", "system-message message");
         container.originalMessage = message;
         container.notify = !!notify;
@@ -2090,7 +2121,7 @@ main.messages.send =
     main.sendReport(
      "undelivered-message",
      "from = " + main.userName + ", to = " + main.recipient);
-    if (animate)
+    if (main.wasAtScrollBottom)
     {
      main.animateScrollingToTheBottom();
     }
@@ -2418,11 +2449,11 @@ main.messages.addMultipleMessages =
 main.messages.addQueuedMessages =
  function (messageList)
  {
-  var i, atScrollBottom = main.$.atScrollBottom();
+  var i;
   main.settings.offline = false;
   main.updateBodyIndicator();
   main.messages.offlineReceptor.innerHTML = "";
-  if (atScrollBottom)
+  if (main.wasAtScrollBottom)
   {
    window.scrollBy(0, -1);
   }
@@ -2441,7 +2472,7 @@ main.messages.addQueuedMessages =
    }
   }
   main.messages.addMultipleMessages(messageList);
-  if (atScrollBottom)
+  if (main.wasAtScrollBottom)
   {
    window.scroll(0, main.html.scrollHeight);
   }
@@ -2463,7 +2494,6 @@ main.messages.addMessage =
       timestampString =
        timestamp.getFullYear() + "-" + (timestamp.getMonth() + 1)+ "-" +
        timestamp.getDate() + " " + timestamp.toLocaleTimeString(),
-      atScrollBottom = main.$.atScrollBottom(),
       messageContent, receptor = main.messages.receptor;
   /*jslint sub: false*/
 
@@ -2553,9 +2583,9 @@ main.messages.addMessage =
   {
    if (received && !doNotNotify)
    {
-    main.messages.notify(!atScrollBottom);
+    main.messages.notify(!main.wasAtScrollBottom);
    }
-   if (atScrollBottom)
+   if (main.wasAtScrollBottom)
    {
     main.animateScrollingToTheBottom();
     //main.body.scrollTop = main.html.scrollHeight;

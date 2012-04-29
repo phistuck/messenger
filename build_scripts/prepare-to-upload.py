@@ -1,7 +1,7 @@
 import httplib, urllib, sys, os
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 sys.path = sys.path + [r"lib",
-                       r"lib\webob", r"lib\django_0_96"]
+                       r"lib\webob_1_1_1", r"lib\django_0_96"]
 from google.appengine.ext.webapp import template
 
 converse_script_path = DIR_PATH + r"\..\scripts\converse.js"
@@ -16,16 +16,11 @@ if previous_converse_script:
  should_minify = not converse_script_content == previous_converse_script.read()
 previous_converse_script.close()
 if should_minify:
- 
- previous_converse_script = open(previous_converse_script_path, "wb")
- previous_converse_script.write(converse_script_content)
- previous_converse_script.close()
  code = template.render(converse_script_path, {})
- import re
  code = \
-  re.sub(
-   "var /* @const */ MAIN_DEBUG = true;",
-   "var /* @const */ MAIN_DEBUG = false;", code)
+  code.replace(
+   "var /** @const */ MAIN_DEBUG = true;",
+   "var /** @const */ MAIN_DEBUG = false;")
  externs = template.render(DIR_PATH + r"\..\scripts\externs.js", {})
 
  params = urllib.urlencode(
@@ -50,6 +45,10 @@ if should_minify:
  print "Cleaning up."
  output.close()
  conn.close
+ print "Keeping the current script as the previous script."
+ previous_converse_script = open(previous_converse_script_path, "wb")
+ previous_converse_script.write(converse_script_content)
+ previous_converse_script.close()
  print "All is done!"
 else:
  print "Nothing to minify, all is done!"
