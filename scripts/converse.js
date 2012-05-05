@@ -295,36 +295,33 @@ main.$.createRequest =
   {
    return new Request();
   }
-  else
+  Request = window.ActiveXObject;
+  if (Request)
   {
-   Request = window.ActiveXObject;
-   if (Request)
+   try
+   {
+    return new Request("Msxml2.XMLHTTP.6.0");
+   }
+   catch (e1)
    {
     try
     {
-     return new Request("Msxml2.XMLHTTP.6.0");
+     return new Request("Msxml2.XMLHTTP.3.0");
     }
-    catch (e1)
+    catch (e2)
     {
      try
      {
-      return new Request("Msxml2.XMLHTTP.3.0");
+      return new Request("Msxml2.XMLHTTP");
      }
-     catch (e2)
+     catch (e3)
      {
       try
       {
-       return new Request("Msxml2.XMLHTTP");
+       return new Request("Microsoft.XMLHTTP");
       }
-      catch (e3)
+      catch (e4)
       {
-       try
-       {
-        return new Request("Microsoft.XMLHTTP");
-       }
-       catch (e4)
-       {
-       }
       }
      }
     }
@@ -383,8 +380,8 @@ main.$.load =
    {
     return window.sessionStorage[name];
    }
-   else if (window.localStorage &&
-            typeof window.localStorage[name] !== "undefined")
+   if (window.localStorage &&
+       typeof window.localStorage[name] !== "undefined")
    {
     return window.localStorage[name];
    }
@@ -564,9 +561,16 @@ main.handleGlobalShortcuts =
    main.toggleConcealmentMode();
   }
   // F2 toggles new message notifications.
-  else if (main.newMessages && key === 113)
+  else if (key === 113)
   {
-   main.messages.confirmRead();
+   if (main.newMessages)
+   {
+    main.messages.confirmRead();
+   }
+   else
+   {
+    main.messageField.focus();
+   }
   }
   else if (key === 119)
   {
@@ -738,8 +742,8 @@ main.updatePresenceData =
   {
    return;
   }
-  else if ((indicateTypingState || typedLately) &&
-           main.messageField.value.replace(main.$.whitespacePatten, ""))
+  if ((indicateTypingState || typedLately) &&
+      main.messageField.value.replace(main.$.whitespacePatten, ""))
   {
    main.lastTypingIndicationTimestamp = now;
    typing = "&typing=1";
@@ -1034,26 +1038,23 @@ main.reclaimToken =
    clearInterval(main.messages.checkerTimer);
    return;
   }
-  else
+  if (main.channelCount === 20)
   {
-   if (main.channelCount === 20)
+   if (((new Date()).getTime() - main.channelCountStartTime) < 54e5)
    {
-    if (((new Date()).getTime() - main.channelCountStartTime) < 54e5)
-    {
-     main.showDialog(
-      "Sorry, your internet connection may be too flaky, " +
-      "which causes us to break over our limits, thus making everyone, " +
-      "everywhere else unhappy. Please, do not refresh...");
-     main.sendReport("too-many-channels", navigator.userAgent);
-    }
-    else
-    {
-     main.channelCount = 1;
-     main.channelCountStartTime = (new Date()).getTime();
-    }
+    main.showDialog(
+     "Sorry, your internet connection may be too flaky, " +
+     "which causes us to break over our limits, thus making everyone, " +
+     "everywhere else unhappy. Please, do not refresh...");
+    main.sendReport("too-many-channels", navigator.userAgent);
    }
-   main.channelCount++;
+   else
+   {
+    main.channelCount = 1;
+    main.channelCountStartTime = (new Date()).getTime();
+   }
   }
+  main.channelCount++;
   /*jslint plusplus: false*/
   /*if (!iFrame)
   {
@@ -1929,8 +1930,8 @@ main.messages.handleMessageFieldKeys =
   {
    return false;
   }
-  else if ((key === 13 || mobileEnter) &&
-           !e.shiftKey)
+  if ((key === 13 || mobileEnter) &&
+      !e.shiftKey)
   {
    if (e.ctrlKey)
    {
@@ -2596,9 +2597,9 @@ main.messages.iterateThroughMessages =
  function (runAction)
  {
   var elements, i, length;
-  if (main.doc.querySelectorAll)
+  if (main.messages.messagePane.querySelectorAll)
   {
-   elements = main.doc.querySelectorAll(".message");
+   elements = main.messages.messagePane.querySelectorAll(".message");
    /*jslint plusplus: true*/
    for (i = 0, length = elements.length; i < length; i++)
    {
@@ -2630,18 +2631,15 @@ main.messages.findMessageByKey =
   {
    return main.doc.querySelector("[data-key=\"" + key + "\"]");
   }
-  else
+  messages = main.$.tag("div", main.messages.messagePane);
+  length = messages.length;
+  /*jslint plusplus: true*/
+  for (i = 0; i < length; i++)
   {
-   messages = main.$.tag("div", main.messages.messagePane);
-   length = messages.length;
-   /*jslint plusplus: true*/
-   for (i = 0; i < length; i++)
+  /*jslint plusplus: false*/
+   if (messages[i].getAttribute("data-key") === key)
    {
-   /*jslint plusplus: false*/
-    if (messages[i].getAttribute("data-key") === key)
-    {
-     return messages[i];
-    }
+    return messages[i];
    }
   }
   return null;
