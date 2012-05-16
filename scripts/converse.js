@@ -1267,6 +1267,12 @@ main.initialize =
     }
    }
   }
+  if (navigator.userAgent.indexOf("Windows") !== -1 &&
+      main.$.getCookie("authenticated") !== "1")
+  {
+   main.doc.location.reload();
+   return;
+  }
   if (navigator.geolocation)
   {
    checkLocation();
@@ -2674,7 +2680,7 @@ if (main.desktop)
 /*jslint sub: false*/
 if (MAIN_DEBUG)
 {
- main.$.log("Questions & answers?");
+ main.$.log("Questions  & answers?");
  main.$.log("Implement the iPhone audio playback workaround?");
 }
 // }());

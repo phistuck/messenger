@@ -10,6 +10,7 @@ from google.appengine.ext import db, deferred
 from google.appengine.ext.webapp import template #, util
 from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
 
+
 from messenger \
  import authentication, db_util, time_util, canned_messages, \
         internationalization, user_details
@@ -71,6 +72,9 @@ def parse_iso_timestamp(iso_timestamp):
  else:
   return datetime.strptime(
          trailing_z_pattern.sub("", iso_timestamp), "%Y-%m-%dT%H:%M:%S")
+
+def parse_timestamp(timestamp):
+ return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
 def write_message(manage, message, user):
  content = message.content
@@ -153,22 +157,14 @@ def to_json(variable, indent = DEV_MODE):
 def from_json(json_string):
  return json.loads(json_string)
 
-def get_application_data():
- global data
- return memcache.get("application-data") or {}
-
-data = get_application_data()
- 
-def get_data(name, initial_value):
- global data
+def get_data(name, initial_value, data = None):
  if not data:
-  data = get_application_data()
+  data = memcache.get("application-data") or {}
  if not name in data:
   data[name] = initial_value
- return data[name]
+ return (data, data[name])
 
-def set_data():
- global data
+def set_data(data):
  memcache.set("application-data", data)
 
 def initialize_user_data(users_data, user):
@@ -185,8 +181,8 @@ timestamp_2000 = datetime(year = 2000, month = 1, day = 1)
 timestamp_2001 = datetime(year = 2001, month = 1, day = 1)
 
 def get_set_history_data(
- sender, recipient, property = None, value = None):
- history_data = get_data("history-data", {})
+ data, sender, recipient, property = None, value = None):
+ history_data = data["history-data"]
  save = False
 
  if not sender in history_data:
@@ -216,20 +212,21 @@ def get_set_history_data(
   history_data[recipient][sender][property] = value
   history_data[sender][recipient][property] = value
  if save:
-  set_data()
+  set_data(data)
  return history_data
 
 def send_message(
- test_mode, dynamic, user, recipient, content, notify, unique_id = None):
+ test_mode, dynamic, user, recipient, content, notify, data = None,
+ unique_id = None):
  if notify:
   notify_recipient(recipient)
  try:
   message = db_util.save_message(test_mode, user, recipient, content, notify)
   if not content:
    return True
-  users_data = get_data("users-data", {})
-  history_data = get_data("history-data", {})
-  get_set_history_data(user, recipient)
+  (data, users_data) = get_data("users-data", {}, data = data)
+  (data, history_data) = get_data("history-data", {}, data = data)
+  get_set_history_data(data, user, recipient)
   last_message = history_data[user][recipient]["last-message"]
   message_json = \
    to_json(
@@ -245,17 +242,17 @@ def send_message(
   send_channel_message(test_mode, recipient, message_json)
   send_channel_message(test_mode, user, message_json)
   get_set_history_data(
-   user, recipient, property = "last-message", value = message.timestamp)
-  if is_xmpp_user_available(recipient):
+   data, user, recipient, property = "last-message", value = message.timestamp)
+  if is_xmpp_user_available(recipient, data = data):
    send_chat_message(user_details.users[recipient]["email"], content)
    get_set_history_data(
-    recipient, user, property = "last-read-message-timestamp",
+    data, recipient, user, property = "last-read-message-timestamp",
     value = message.timestamp)
   user_data = initialize_user_data(users_data, recipient)
   if not user_data["last-read-message-timestamp"]:
    user_data["last-read-message-timestamp"] = \
     (datetime.now() - timedelta(seconds = 1))
-   set_data()
+   set_data(data)
   return True
  except (db.NotSavedError, db.Timeout, apiproxy_errors.DeadlineExceededError):
   if not dynamic:
@@ -263,10 +260,10 @@ def send_message(
   else:
    raise "Error"
 
-def convert_coordinates_to_address(location):
+def convert_coordinates_to_address(location, data = None):
  if location:
   try:
-   locations = get_data("locations", {})
+   (data, locations) = get_data("locations", {}, data = data)
    if not location in locations:
     response = \
      urlfetch.fetch(
@@ -274,16 +271,16 @@ def convert_coordinates_to_address(location):
       location + "&sensor=true")
     content = from_json(response.content)
     locations[location] = content[u"results"][0][u"formatted_address"]
-    set_data()
+    set_data(data)
    return locations[location]
   except:
    return ""
 
 def update_presence_state(
  test_mode, user, location, typing, online, recipient = None,
- last_read_message_timestamp = None, thinking = False):
+ last_read_message_timestamp = None, data = None, thinking = False):
  if user:
-  active_users = get_data("active-users", {})
+  (data, active_users) = get_data("active-users", {}, data = data)
   if (not online) and user in active_users:
    del active_users[user]
   else:
@@ -296,25 +293,25 @@ def update_presence_state(
      "thinking": False
     }
    if last_read_message_timestamp:
-    users_data = get_data("users-data", {})
+    (data, users_data) = get_data("users-data", {}, data = data)
     user_data = initialize_user_data(users_data, user)
     user_data["last-read-message-timestamp"] = last_read_message_timestamp
    if user in active_users:
     previous_user_state = active_users[user]
     if location and location != previous_user_state["location-coordinates"]:
-     resolved_address = convert_coordinates_to_address(location)
+     resolved_address = convert_coordinates_to_address(location, data)
      user_state["location"] = resolved_address
     else:
      user_state["location"] = previous_user_state["location"]
    else:
-    user_state["location"] = convert_coordinates_to_address(location)
+    user_state["location"] = convert_coordinates_to_address(location, data)
    user_state["thinking"] = thinking
    if online:
     active_users[user] = user_state
   querier_message_json = None;
   if recipient:
-   history_data = get_data("history-data", {})
-   get_set_history_data(user, recipient);
+   (data, history_data) = get_data("history-data", {}, data = data)
+   get_set_history_data(data, user, recipient);
    last_message_timestamp = history_data[user][recipient]["last-message"]
    if not last_message_timestamp == timestamp_1999:
     querier_message_json = \
@@ -324,7 +321,7 @@ def update_presence_state(
        "value": active_users,
        "last-message-timestamp": last_message_timestamp.isoformat()
       })
-  set_data()
+  set_data(data)
   message_json = \
    to_json(
     {
@@ -368,9 +365,9 @@ class ReclaimChannelTokenPage(webapp2.RequestHandler):
   except apiproxy_errors.OverQuotaError:
    pass
 
-def get_last_messages_for_user(test_mode, user, unlimited):
+def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object = {}
- users_data = get_data("users-data", {})
+ (data, users_data) = get_data("users-data", {}, data = data)
  user_data = initialize_user_data(users_data, user)
  timestamp = user_data["last-read-message-timestamp"]
  advanced_timestamp = None
@@ -487,8 +484,7 @@ class RemoveMessagePage(webapp2.RequestHandler):
   send_channel_message(test_mode, recipient, message_json)
 
 def import_message_history_import_async(test_mode):
-   global data
-   data = data or get_application_data()
+   data = memcache.get("application-data") or {}
    if not "imported-messages" in data:
     data["imported-messages"] = 0
    messages_to_import = []
@@ -520,7 +516,7 @@ def import_message_history_import_async(test_mode):
       if messages_to_import[0].key():
        messages_to_import.pop(0)
        data["imported-messages"] = data["imported-messages"] + 1
-       set_data()
+       set_data(data)
       else:
        break
      if len(messages_to_import):
@@ -545,13 +541,14 @@ class SendMessagePage(webapp2.RequestHandler):
   dynamic = self.request.get("dynamic") == "1"
   user = self.request.get("from")
   unique_id = self.request.get("unique-id") or None
+  data = None
   if last_read_message_timestamp:
    save_data = True
-   users_data = get_data("users-data", {})
+   (data, users_data) = get_data("users-data", {})
    user_data = initialize_user_data(users_data, user)
    user_data["last-read-message-timestamp"] = \
     parse_iso_timestamp(last_read_message_timestamp)
-  active_users = get_data("active-users", {})
+  (data, active_users) = get_data("active-users", {}, data = data)
   if user in active_users:
    user_state = active_users[user]
    if "thinking" in user_state and user_state["thinking"]:
@@ -567,9 +564,9 @@ class SendMessagePage(webapp2.RequestHandler):
   notify = self.request.get("notify") == "on"
   sent = send_message( \
    test_mode, dynamic, user, recipient, content, notify,
-   unique_id = unique_id)
+   data = data, unique_id = unique_id)
   if save_data:
-   set_data()
+   set_data(data)
   status = "Sent." if sent else "Not sent."
   if static_form_mode and not sent:
    self.response.write(
@@ -587,8 +584,8 @@ class SignOutPage(webapp2.RequestHandler):
   self.response.headers["Set-Cookie"] = "authenticated=0"
   self.redirect("/redirect-to-converse")
 
-def is_xmpp_user_available(user):
- xmpp_users_data = get_data("xmpp-users", {})
+def is_xmpp_user_available(user, data = None):
+ (data, xmpp_users_data) = get_data("xmpp-users", {}, data = data)
  return user in xmpp_users_data and \
          xmpp_users_data[user]["available"] > datetime.now()
 
@@ -603,9 +600,9 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   disguise_service = False
   if not jid in user_details.users:
    return
-  xmpp_users_data = get_data("xmpp-users", {})
-  history_data = get_data("history-data", {})
-  users_data = get_data("users-data", {})
+  (data, xmpp_users_data) = get_data("xmpp-users", {})
+  (data, history_data) = get_data("history-data", {}, data = data)
+  (data, users_data) = get_data("users-data", {}, data = data)
   if not jid in xmpp_users_data:
    xmpp_users_data[jid] = \
     {
@@ -648,7 +645,7 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
 
   def send_new_messages():
    #logging.info("Sending new messages.")
-   history_data = get_set_history_data(user, recipient)
+   history_data = get_set_history_data(data, user, recipient)
    abort_send = True
    has_history_data = False
    if user_data["last-read-message-timestamp"]:
@@ -701,12 +698,12 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   if available_time:
    update_xmpp_state(available_time)
   if transmit_message:
-   sent = send_message(False, False, jid, recipient, body, False)
-   if is_xmpp_user_available(user) and sent:
+   sent = send_message(False, False, jid, recipient, body, False, data = data)
+   if is_xmpp_user_available(user, data = data) and sent:
     message.reply("_Sent._")
-   elif not sent and is_xmpp_user_available(user):
+   elif not sent and is_xmpp_user_available(user, data = data):
      message.reply("_The message could not be delivered... sorry. :(_")
-   elif sent and not is_xmpp_user_available(user):
+   elif sent and not is_xmpp_user_available(user, data = data):
     disguise_service = True
    else:
     disguise_service = "_Sorry, the service is not available._"
@@ -715,7 +712,7 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   if disguise_service:
    send_disguise_message(disguise_service)
   #logging.info(to_json(data, indent = True))
-  set_data()
+  set_data(data)
 
 class HandleChannelConnections(webapp2.RequestHandler):
  def post(self):
@@ -1033,7 +1030,7 @@ email_username_pattern = re.compile("@.+$")
 class SendConversationHistoryPage(webapp2.RequestHandler):
  def get(self):
   """ This will do something nice soon. """
-  history_data = get_data("history-data", {})
+  (data, history_data) = get_data("history-data", {})
   now = datetime.now()
   today = datetime(year = now.year, month = now.month, day = now.day)
   stop = False
@@ -1055,7 +1052,7 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
     #logging.info("partner in history_data[user]? " + str(user in history_data and partner in history_data[user]))
     #logging.info("last-logged is 2000? " + str(user in history_data and partner in history_data[user] and history_data[user][partner]["last-logged-message"] == timestamp_2000))
     #logging.info("last-logged is 2000? " + str(user in history_data and partner in history_data[user] and history_data[user][partner]["last-logged-message"]))
-    history_data = get_set_history_data(user, partner)
+    history_data = get_set_history_data(data, user, partner)
     if no_cache:
      last_timestmap = \
       db_util.fetch_last_logged_message_timestamp(user, partner)
@@ -1063,7 +1060,7 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
       history_data[user][partner]["last-logged-message"] = last_timestmap
      else:
       history_data[user][partner]["last-logged-message"] = timestamp_2001
-      set_data()
+      set_data(data)
     last_logged_message = history_data[user][partner]["last-logged-message"]
     last_sent_message = history_data[user][partner]["last-message"]
     previous_last_sent_message = \
@@ -1115,13 +1112,13 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
       log_object["last-logged-message"])
      history_data[user][partner]["last-logged-message"] = \
       log_object["last-logged-message"]
-     set_data()
+     set_data(data)
      stop = True
      break
     else:
      history_data[user][partner]["previous-last-message"] = \
       history_data[user][partner]["last-message"]
-     set_data()
+     set_data(data)
 
 class StaticFormPage(webapp2.RequestHandler):
  def get(self):
@@ -1151,6 +1148,20 @@ class PrintMemcachePage(webapp2.RequestHandler):
  def get(self):
   self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
   self.response.write(to_json(memcache.get("application-data") or {}, indent = True))
+
+class AddMessagePage(webapp2.RequestHandler):
+ def get(self):
+  write(self, "add-message.html", {})
+ def post(self):
+  timestamp = parse_timestamp(self.request.get("timestamp"))
+  notified = self.request.get("notified") == "on"
+  content = self.request.get("content")
+  sender = self.request.get("from")
+  recipient = self.request.get("to")
+  test_mode = self.request.get("test") == "on"
+  db_util.save_message(test_mode, sender, recipient, content, notified, timestamp = timestamp)
+  write(self, "add-message.html", {"message": "Added."})
+  
 
 class HandleXMPPPresence(webapp2.RequestHandler):
  def post(self):
@@ -1186,6 +1197,7 @@ handler = webapp2.WSGIApplication(
   ("/static-form", StaticFormPage),
   ("/report", ReportPage),
   ("/view-reports", ViewReportsPage),
+  ("/add-message", AddMessagePage),
   ProcessMailPage.mapping()
  ],
  debug = DEV_MODE)

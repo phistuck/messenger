@@ -1,5 +1,6 @@
 application: messenger
-version: 0-0-1-8
+
+version: 0-0-1-9
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -8,6 +9,11 @@ handlers:
 - url: /
   static_files: resources/homepage.html
   upload: resources/homepage\.html
+  mime_type: text/html
+  expiration: 365d
+- url: /crossdomain.xml
+  static_files: resources/crossdomain.xml
+  upload: resources/crossdomain\.xml
   mime_type: text/html
   expiration: 365d
 - url: /redirect-to-converse

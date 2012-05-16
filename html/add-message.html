@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+ <head>
+  <title>Add Message</title>
+  <meta charset="utf-8"/>
+  <style>
+   body, textarea
+   {
+    font: normal 9pt "Arial", sans-serif;
+   }
+   input[type="datetime"], input[type="text"], textarea
+   {
+    width: 200px;
+    margin: 1px;
+    padding: 1px;
+    border: 1px solid gray;
+   }
+   input[type="checkbox"]
+   {
+    padding: 0;
+    margin: 0;
+    vertical-align: text-bottom;
+   }
+  </style>
+ </head>
+ <body>
+  <h1>Add</h1>
+  {{ message }}
+  <form method="post" action="/add-message">
+   <label><input type="checkbox" name="test"/> Test</label><br/>
+   <label>From<br/><input required="required" type="text" name="from"/></label><br/>
+   <label>To<br/><input required="required" type="text" name="to"/></label><br/>
+   <label>Content<br/><textarea required="required" name="content"></textarea></label><br/>
+   <label><input type="checkbox" name="notified"/> Notified</label><br/>
+   <label>Timestamp<br/><input required="required" type="datetime" name="timestamp" value=""/><br/>
+   yyyy-mm-dd hh:mm:ss</label><br/>
+   <br/><input type="submit"/>
+  </form>
+ </body>
+</html>
