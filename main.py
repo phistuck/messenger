@@ -1180,8 +1180,16 @@ class ProcessMailPage(InboundMailHandler):
   sender = sender_email_pattern.sub("\\2", message.sender)
   recipient = email_receiver_pattern.sub("\\1", message.to)
   if invalid_email_receiver_pattern.match(recipient) or \
-     not sender in user_details.users or not recipient in user_details.users:
+     not sender in user_details.users or \
+     ((not recipient == "docs") and \
+      not recipient in user_details.users):
    return
+  if recipient == "docs":
+   if "attachment" in message and len(message.attachments):
+    for (file_name, body) in message.attachments:
+     google_docs_util.store_attachment(file_name, body)
+    #upload_to_google_docs(sender, message.attachments)
+   return;
   user = user_details.users[sender]["internal-name"]
   recipient = user_details.users[recipient]["internal-name"]
   for content_type, body in message.bodies("text/plain"):
@@ -1245,6 +1253,11 @@ handleList = \
 
 if DEV_MODE:
  handleList.append(("/send-command", SendCommandPage))
+
+import google_docs_util
+handleList.append(("/get-authorization-token", google_docs_util.GetAuthorizationTokenPage))
+handleList.append(("/authorize", google_docs_util.AuthorizePage))
+handleList.append(("/upload", google_docs_util.UploadPage))
 
 handler =  webapp2.WSGIApplication(handleList, debug = DEV_MODE)
  #util.run_wsgi_app(handler)

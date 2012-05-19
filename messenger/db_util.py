@@ -1,5 +1,15 @@
 from google.appengine.ext import db
 
+class FileDatabase(db.Model):
+ from google.appengine.ext import blobstore
+ blob_key = blobstore.BlobReferenceProperty()
+ document_key = db.StringProperty()
+ content_length = db.IntegerProperty()
+ content_name = db.StringProperty()
+ content_type = db.StringProperty()
+ last_uploaded_offset = db.IntegerProperty()
+ complete = db.BooleanProperty()
+
 class MessageDatabase(db.Model):
  content = db.TextProperty()
  notified = db.BooleanProperty()
