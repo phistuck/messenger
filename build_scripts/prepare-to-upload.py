@@ -4,23 +4,33 @@ sys.path = sys.path + [r"lib",
                        r"lib\webob_1_1_1", r"lib\django_0_96"]
 from google.appengine.ext.webapp import template
 
+should_minify = False
+
 converse_script_path = DIR_PATH + r"\..\scripts\converse.js"
 previous_converse_script_path = DIR_PATH + r"\..\scripts\converse.previous.js"
 minified_script_path = DIR_PATH + r"\..\scripts\converse.min.js"
+
 converse_script = open(converse_script_path, "r")
 converse_script_content = converse_script.read()
 converse_script.close()
-previous_converse_script = open(previous_converse_script_path, "r")
-should_minify = True
-if previous_converse_script:
- should_minify = not converse_script_content == previous_converse_script.read()
-previous_converse_script.close()
+
+try:
+ previous_converse_script = open(previous_converse_script_path, "r")
+ if previous_converse_script:
+  should_minify = not converse_script_content == previous_converse_script.read()
+ previous_converse_script.close()
+except:
+ print "Could not find the previous converse.js, assuming compilation is necessary anyway."
+ should_minify = True
+
 if should_minify:
  code = template.render(converse_script_path, {})
  code = \
   code.replace(
    "var /** @const */ MAIN_DEBUG = true;",
    "var /** @const */ MAIN_DEBUG = false;")
+ code = code.replace("main.$.log", "if (MAIN_DEBUG) main.$.log");
+ code = code.replace("console.log", "if (MAIN_DEBUG) console.log");
  externs = template.render(DIR_PATH + r"\..\scripts\externs.js", {})
 
  params = urllib.urlencode(
@@ -39,7 +49,7 @@ if should_minify:
  conn.request("POST", "/compile", params, headers)
  response = conn.getresponse()
  print "Opening the output file (*.min.js)."
- output = open(DIR_PATH + r"\..\scripts\converse.min.js","wb")
+ output = open(DIR_PATH + r"\..\scripts\converse.min.js", "wb")
  print "Writing the minified JavaScript file."
  output.write(response.read())
  print "Cleaning up."

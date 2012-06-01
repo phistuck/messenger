@@ -2,24 +2,32 @@
 <html>
  <head>
   <meta http-equiv="Content-Type" content="text/html; CharSet=utf-8"/>
-  <title>Messenger</title>
+  <title>Form</title>
   <meta name="viewport"
         content="width=device-width; initial-scale=1.0; maximum-scale=1;
                  minimum-scale=1; user-scalable=0;"/>
   <style type="text/css">
    body, input { font: normal 1em "Arial"; }
+   form { display: inline; }
   </style>
  </head>
  <body>
   <form method="post" action="{{ action }}">
-   <h1>Messenger</h1>
    <input type="hidden" name="from" value="{{ from }}"/>
    <input type="hidden" name="to" value="{{ to }}"/>
    <input type="text" name="content" autocomplete="off"
           autofocus="autofocus"/><br/>
    <input type="checkbox" checked="checked" name="notify"/> Alert<br/>
    <input type="hidden" name="static-form" value="1"/>
-   <input type="submit" value="Send &amp; Log In"/>
+   <input type="submit" value="Submit"/>
+  </form>
+  <form method="post" action="{{ action }}">
+   <input type="hidden" name="from" value="{{ from }}"/>
+   <input type="hidden" name="to" value="{{ to }}"/>
+   <input type="hidden" name="notify" value="on"/>
+   <input type="hidden" name="content" value="Ping."/>
+   <input type="hidden" name="static-form" value="1"/>
+   <input type="submit" value="Ping"/>
   </form>
  </body>
 </html>

@@ -20,7 +20,7 @@
   <div class="fetch-more-messages"><a data-action="fetch-more-messages"
        href="#fetch-more-messages">Show more messages</a></div>
   <div id="presence-data">
-   <!--{% if desktop_mode %}<a data-action="exit-application" href="#">X</a>{% endif %}--><a
+   {% if desktop_mode %}{% if dev_mode %}<!--<a data-action="exit-application" href="#">X</a>-->{% endif %}{% endif %}<a
       href="/sign-out"><img border="0"
       src="images/sign-out.png" width="15" height="15" alt="Sign Out"/></a><a
       data-action="settings" href="#settings"><img data-action="settings"
@@ -61,6 +61,11 @@
      <input type="range" name="sound-notification-volume"
             value="0.99" step="0.01" min="0" max="1"/></small>
     <div>
+     <a target="_blank" href="/static-form?from={{ user }}&to={{ to }}">
+      Download a static message sending form
+     </a>
+    </div>
+    <div>
      <label><input type="checkbox" name="visual-notification"/>
       Enable desktop notifications (popups)</label>
     </div>
@@ -71,11 +76,6 @@
     <div>
      <a href="/converse?from={{ user }}&to={{ to }}&test={{ test }}&manage=1">
       Let me delete messages
-     </a>
-    </div>
-    <div>
-     <a target="_blank" href="/static-form?from={{ user }}&to={{ to }}">
-      Download a static message sending form
      </a>
     </div>
    </form>

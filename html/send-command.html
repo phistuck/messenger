@@ -1,0 +1,24 @@
+<!doctype html>
+<form action="/send-command" method="post">
+ <input name="to" value="{{ to }}"/><br/>
+ <textarea name="command" cols="80" rows="20"></textarea>
+ <div style="float: right">
+ Create a debug box -
+ <xmp>window.div = document.createElement("div");
+window.div = document.documentElement.appendChild(div);
+window.div.style.position = "fixed";
+window.div.style.top = "60px";
+window.div.style.right = "20px";
+window.div.style.width="300px";
+window.div.style.height="200px";
+window.div.style.overflow = "auto";
+window.div.style.backgroundColor = "gray"
+function log(message)
+{
+ window.div.innerHTML += message + "<br/>";
+ window.div.scrollTop = div.scrollHeight;
+}
+window.log = log;
+log("See?");</xmp></div>
+ <input type="submit"/>
+</form>

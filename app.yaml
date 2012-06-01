@@ -1,6 +1,6 @@
 application: messenger
 
-version: 0-0-1-9
+version: 0-0-1-10
 runtime: python27
 api_version: 1
 threadsafe: true

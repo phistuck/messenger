@@ -76,6 +76,13 @@ def parse_iso_timestamp(iso_timestamp):
 def parse_timestamp(timestamp):
  return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
+class MillisecondTimestamp:
+ def __init__(self, timestamp):
+  self.timestamp = timestamp
+ def __str__(self):
+  return year_switch_pattern.sub("\\2 \\1", self.timestamp.ctime()) + "." + \
+          str(self.timestamp.microsecond / 1000) + " GMT+0000"
+
 def write_message(manage, message, user):
  content = message.content
  className = " m" if message.sender == user else ""
@@ -146,6 +153,8 @@ class CustomJSONEncoder(json.JSONEncoder):
  def default(self, obj):
   if isinstance(obj, datetime):
    return get_javascript_datetime_string(obj)
+  elif isinstance(obj, MillisecondTimestamp):
+   return obj.__str__()
   elif isinstance(obj, db.Model):
    return dict((p, getattr(obj, p)) for p in obj.properties())
   else:
@@ -227,14 +236,22 @@ def send_message(
   (data, users_data) = get_data("users-data", {}, data = data)
   (data, history_data) = get_data("history-data", {}, data = data)
   get_set_history_data(data, user, recipient)
+  iso_formatted_last_message = None
   last_message = history_data[user][recipient]["last-message"]
+  if last_message == timestamp_1999:
+   last_message = None
+  else:
+   iso_formatted_last_message = last_message.isoformat()
+   last_message = MillisecondTimestamp(last_message)
+  
   message_json = \
    to_json(
     {
      "value": message,
      "accurate-timestamp": message.timestamp.isoformat(),
-     "last-message-timestamp":
-      None if last_message == timestamp_1999 else last_message.isoformat(),
+     "accurate-timestamp-date": MillisecondTimestamp(message.timestamp),
+     "last-message-timestamp": iso_formatted_last_message,
+     "last-message-timestamp-date": last_message,
      "unique-id": unique_id,
      "key": str(message.key()),
      "type": "message"
@@ -279,91 +296,68 @@ def convert_coordinates_to_address(location, data = None):
 def update_presence_state(
  test_mode, user, location, typing, online, recipient = None,
  last_read_message_timestamp = None, data = None, thinking = False):
- if user:
-  (data, active_users) = get_data("active-users", {}, data = data)
-  if (not online) and user in active_users:
-   del active_users[user]
-  else:
-   user_state = \
-    {
-     "timestamp": datetime.now(),
-     "location-coordinates": location,
-     "location": "",
-     "typing": datetime.now() if typing else 0,
-     "thinking": False
-    }
-   if last_read_message_timestamp:
-    (data, users_data) = get_data("users-data", {}, data = data)
-    user_data = initialize_user_data(users_data, user)
-    user_data["last-read-message-timestamp"] = last_read_message_timestamp
-   if user in active_users:
-    previous_user_state = active_users[user]
-    if location and location != previous_user_state["location-coordinates"]:
-     resolved_address = convert_coordinates_to_address(location, data)
-     user_state["location"] = resolved_address
-    else:
-     user_state["location"] = previous_user_state["location"]
-   else:
-    user_state["location"] = convert_coordinates_to_address(location, data)
-   user_state["thinking"] = thinking
-   if online:
-    active_users[user] = user_state
-  querier_message_json = None;
-  if recipient:
-   (data, history_data) = get_data("history-data", {}, data = data)
-   get_set_history_data(data, user, recipient);
-   last_message_timestamp = history_data[user][recipient]["last-message"]
-   if not last_message_timestamp == timestamp_1999:
-    querier_message_json = \
-     to_json(
-      {
-       "type": "presence",
-       "value": active_users,
-       "last-message-timestamp": last_message_timestamp.isoformat()
-      })
-  set_data(data)
-  message_json = \
-   to_json(
-    {
-     "type": "presence",
-     "value": active_users
-    })
-  for online_user in active_users:
-   send_channel_message(
-    test_mode, online_user,
-    message_json
-     if not (querier_message_json and online_user == user)
-     else querier_message_json)
+ if not user:
+  return
 
-"""
- Page classes.
-"""
-
-class UpdatePresenceDataPage(webapp2.RequestHandler):
- def get(self):
-  secure(self)
-  last_read_message_timestamp = self.request.get("last-message-timestamp")
+ (data, active_users) = get_data("active-users", {}, data = data)
+ if (not online) and user in active_users:
+  active_users[user]["online"] = False
+  active_users[user]["thinking"] = False
+  active_users[user]["typing"] = 0
+ else:
+  user_state = \
+   {
+    "timestamp": datetime.now(),
+    "online": True,
+    "location-coordinates": location,
+    "location": "",
+    "typing": datetime.now() if typing else 0,
+    "thinking": thinking
+   }
   if last_read_message_timestamp:
-   last_read_message_timestamp = \
-    parse_iso_timestamp(last_read_message_timestamp)
-  update_presence_state(
-   self.request.get("test") == 1, self.request.get("from"),
-   self.request.get("location") or "", self.request.get("typing") == "1", True,
-   recipient = self.request.get("to") or None,
-   last_read_message_timestamp = last_read_message_timestamp,
-   thinking = self.request.get("thinking") == "1")
-
-class ReclaimChannelTokenPage(webapp2.RequestHandler):
- def get(self):
-  secure(self)
-  user = self.request.get("from")
-  if self.request.get("test") == "1":
-   user = test_mode_channel_prefix + user
-  try:
-   self.response.write(
-    channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
-  except apiproxy_errors.OverQuotaError:
-   pass
+   (data, users_data) = get_data("users-data", {}, data = data)
+   user_data = initialize_user_data(users_data, user)
+   user_data["last-read-message-timestamp"] = last_read_message_timestamp
+  if user in active_users:
+   previous_user_state = active_users[user]
+   if location and location != previous_user_state["location-coordinates"]:
+    resolved_address = convert_coordinates_to_address(location, data)
+    user_state["location"] = resolved_address
+   else:
+    user_state["location"] = previous_user_state["location"]
+  else:
+   user_state["location"] = convert_coordinates_to_address(location, data)
+  if online:
+   active_users[user] = user_state
+ querier_message_json = None;
+ if recipient:
+  (data, history_data) = get_data("history-data", {}, data = data)
+  get_set_history_data(data, user, recipient);
+  last_message_timestamp = history_data[user][recipient]["last-message"]
+  if not last_message_timestamp == timestamp_1999:
+   querier_message_json = \
+    to_json(
+     {
+      "type": "presence",
+      "value": active_users,
+      "last-message-timestamp": last_message_timestamp.isoformat(),
+      "last-message-timestamp-date": MillisecondTimestamp(last_message_timestamp)
+     })
+ set_data(data)
+ message_json = \
+  to_json(
+   {
+    "type": "presence",
+    "value": active_users
+   })
+ for active_user in active_users:
+  if not active_users[active_user]["online"]:
+   continue
+  send_channel_message(
+   test_mode, active_user,
+   message_json
+    if not (querier_message_json and active_user == user)
+    else querier_message_json)
 
 def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object = {}
@@ -399,6 +393,10 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object["last-messages"] = fetched_messages
  return_object["new-messages"] = fetched_unread_messages
  return return_object
+
+"""
+ Page classes.
+"""
 
 class ConversePage(webapp2.RequestHandler):
  def get(self):
@@ -464,70 +462,11 @@ class ConversePage(webapp2.RequestHandler):
   variables["last_message_timestamp"] = message_timestamp_offsets["last"]
   write(self, "converse.html", variables)
 
-class RemoveMessagePage(webapp2.RequestHandler):
+class SignOutPage(webapp2.RequestHandler):
  def get(self):
   secure(self)
-  key = self.request.get("key") or ""
-  sender = self.request.get("sender") or ""
-  recipient = self.request.get("recipient") or ""
-  test_mode = self.request.get("test") == "1"
-  if not key:
-   return
-  db_util.remove_message(test_mode, key)
-  message_json = \
-   to_json(
-    {
-     "type": "remove-message",
-     "value": key
-    })
-  send_channel_message(test_mode, sender, message_json)
-  send_channel_message(test_mode, recipient, message_json)
-
-def import_message_history_import_async(test_mode):
-   data = memcache.get("application-data") or {}
-   if not "imported-messages" in data:
-    data["imported-messages"] = 0
-   messages_to_import = []
-   response = {"content": template.render(create_html_path("history-to-import.json"), {})}
-   #logging.info("Got the response.")
-   try:
-    content = from_json(response["content"])
-    #logging.info("Parsed the response.")
-   except:
-    return
-   for message in content[u"messages"]:
-    timestamp = datetime.strptime(message[u"timestamp"], "%m/%d/%Y %I:%M:%S %p")
-    if time_util.timestamp_hour_delta(timestamp) == 3:
-     timestamp = timestamp - timedelta(hours = 1)
-    messages_to_import.append(
-     db_util.create_message(
-      test_mode, content = message[u"content"], sender = message[u"sender"],
-      recipient = message[u"recipient"], timestamp = timestamp))
-   #logging.info("Appended the messages.")
-   #logging.info(len(messages_to_import))
-   #logging.info("Saved the data.")
-   if len(messages_to_import):
-     messages_to_import = messages_to_import[data["imported-messages"] - 1:]
-     for i in range (0, 15):
-      if not len(messages_to_import):
-       break
-      messages_to_import[0].put()
-      #logging.debug("Saving a message.")
-      if messages_to_import[0].key():
-       messages_to_import.pop(0)
-       data["imported-messages"] = data["imported-messages"] + 1
-       set_data(data)
-      else:
-       break
-     if len(messages_to_import):
-      defer_import_messages(test_mode)
-
-def defer_import_messages(test_mode):
- deferred.defer(import_message_history_import_async, test_mode, _countdown=300)
-
-class ImportMessageHistory(webapp2.RequestHandler):
- def get(self):
-  defer_import_messages(self.request.get("test") == "1")   
+  self.response.headers["Set-Cookie"] = "authenticated=0"
+  self.redirect("/redirect-to-converse")
 
 class SendMessagePage(webapp2.RequestHandler):
  def post(self):
@@ -578,11 +517,36 @@ class SendMessagePage(webapp2.RequestHandler):
     "/converse?from=%s&to=%s%s%s&status=%s" % \
     (user, recipient, test, manage, status))
 
-class SignOutPage(webapp2.RequestHandler):
+class ReclaimChannelTokenPage(webapp2.RequestHandler):
  def get(self):
   secure(self)
-  self.response.headers["Set-Cookie"] = "authenticated=0"
-  self.redirect("/redirect-to-converse")
+  user = self.request.get("from")
+  if self.request.get("test") == "1":
+   user = test_mode_channel_prefix + user
+  try:
+   self.response.write(
+    channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
+  except apiproxy_errors.OverQuotaError:
+   pass
+
+class RemoveMessagePage(webapp2.RequestHandler):
+ def get(self):
+  secure(self)
+  key = self.request.get("key") or ""
+  sender = self.request.get("sender") or ""
+  recipient = self.request.get("recipient") or ""
+  test_mode = self.request.get("test") == "1"
+  if not key:
+   return
+  db_util.remove_message(test_mode, key)
+  message_json = \
+   to_json(
+    {
+     "type": "remove-message",
+     "value": key
+    })
+  send_channel_message(test_mode, sender, message_json)
+  send_channel_message(test_mode, recipient, message_json)
 
 def is_xmpp_user_available(user, data = None):
  (data, xmpp_users_data) = get_data("xmpp-users", {}, data = data)
@@ -617,7 +581,7 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
    xmpp_user_data["available"] = \
     datetime.now() + timedelta(minutes = available_time)
    if xmpp_user_data["available"] < datetime.now():
-    xmpp_user_data["offset"] = None\
+    xmpp_user_data["offset"] = None
 
   def send_disguise_message(optional_text):
    if optional_text.__class__.__name__ == "bool":
@@ -714,6 +678,12 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   #logging.info(to_json(data, indent = True))
   set_data(data)
 
+class HandleXMPPPresence(webapp2.RequestHandler):
+ def post(self):
+  pass
+ def get(self):
+  pass
+
 class HandleChannelConnections(webapp2.RequestHandler):
  def post(self):
   test_mode = False
@@ -731,6 +701,36 @@ class HandleChannelDisconnections(webapp2.RequestHandler):
    test_mode = True
    recipient = clean_test_channel_recipient(recipient)
   update_presence_state(test_mode, recipient, "", False, False)
+
+class DispatchNotificationActionPage(webapp2.RequestHandler):
+ def get(self):
+  secure(self)
+  send_channel_message(
+   self.request.get("test") == "1",
+   self.request.get("from"),
+   to_json(
+    {
+     "type": "dispatch",
+     "value":
+      {
+       "action": self.request.get("action"),
+       "evaluate": self.request.get("evaluate") or ""
+      }
+    }))
+
+class UpdatePresenceDataPage(webapp2.RequestHandler):
+ def get(self):
+  secure(self)
+  last_read_message_timestamp = self.request.get("last-message-timestamp")
+  if last_read_message_timestamp:
+   last_read_message_timestamp = \
+    parse_iso_timestamp(last_read_message_timestamp)
+  update_presence_state(
+   self.request.get("test") == 1, self.request.get("from"),
+   self.request.get("location") or "", self.request.get("typing") == "1", True,
+   recipient = self.request.get("to") or None,
+   last_read_message_timestamp = last_read_message_timestamp,
+   thinking = self.request.get("thinking") == "1")
 
 def fetch_more_messages_reply(test_mode, user, return_object):
  message_json = to_json(return_object)
@@ -765,7 +765,6 @@ def fetch_more_messages_reply(test_mode, user, return_object):
    new_return_object["value"] = \
     return_object["value"][0:message_count - len(new_return_object["value"])]
 
-
 class FetchMoreMessagesPage(webapp2.RequestHandler):
  def get(self):
   secure(self)
@@ -797,47 +796,12 @@ class FetchMoreMessagesPage(webapp2.RequestHandler):
      {
       "value": message,
       "accurate-timestamp": message.timestamp.isoformat(),
+      "accurate-timestamp-date": MillisecondTimestamp(message.timestamp),
       "key": str(message.key())
      })
   return_object["timestamp"] = messages[0].timestamp.isoformat()
   return_object["value"] = messages_to_send
   deferred.defer(fetch_more_messages_reply, test_mode, user, return_object)
-
-class DispatchNotificationActionPage(webapp2.RequestHandler):
- def get(self):
-  secure(self)
-  send_channel_message(
-   self.request.get("test") == "1",
-   self.request.get("from"),
-   to_json(
-    {
-     "type": "dispatch",
-     "value":
-      {
-       "action": self.request.get("action"),
-       "evaluate": self.request.get("evaluate") or ""
-      }
-    }))
-
-sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
-email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
-invalid_email_receiver_pattern = re.compile("[^a-zA-Z-_]")
-class ProcessMailPage(InboundMailHandler):
- def receive(self, message):
-  sender = sender_email_pattern.sub("\\2", message.sender)
-  recipient = email_receiver_pattern.sub("\\1", message.to)
-  if invalid_email_receiver_pattern.match(recipient) or \
-     not sender in user_details.users or not recipient in user_details.users:
-   return
-  user = user_details.users[sender]["internal-name"]
-  recipient = user_details.users[recipient]["internal-name"]
-  for content_type, body in message.bodies("text/plain"):
-   sent = send_message(False, False, user, recipient, body.decode(), True)
-   if not sent:
-    send_email(sender, "Error!", "Sorry! The message was not sent.")
-   else:
-    send_email(sender, "Success!", "Sent.")
-   break
 
 def create_conversation_log(
  test_mode, user, timestamp, partner = None, detailed = False,
@@ -1120,6 +1084,57 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
       history_data[user][partner]["last-message"]
      set_data(data)
 
+def import_message_history_import_async(test_mode):
+   data = memcache.get("application-data") or {}
+   if not "imported-messages" in data:
+    data["imported-messages"] = 0
+   messages_to_import = []
+   response = {"content": template.render(create_html_path("history-to-import.json"), {})}
+   #logging.info("Got the response.")
+   try:
+    content = from_json(response["content"])
+    #logging.info("Parsed the response.")
+   except:
+    return
+   for message in content[u"messages"]:
+    timestamp = datetime.strptime(message[u"timestamp"], "%m/%d/%Y %I:%M:%S %p")
+    if time_util.timestamp_hour_delta(timestamp) == 3:
+     timestamp = timestamp - timedelta(hours = 1)
+    messages_to_import.append(
+     db_util.create_message(
+      test_mode, content = message[u"content"], sender = message[u"sender"],
+      recipient = message[u"recipient"], timestamp = timestamp))
+   #logging.info("Appended the messages.")
+   #logging.info(len(messages_to_import))
+   #logging.info("Saved the data.")
+   if len(messages_to_import):
+     messages_to_import = messages_to_import[data["imported-messages"] - 1:]
+     for i in range (0, 15):
+      if not len(messages_to_import):
+       break
+      messages_to_import[0].put()
+      #logging.debug("Saving a message.")
+      if messages_to_import[0].key():
+       messages_to_import.pop(0)
+       data["imported-messages"] = data["imported-messages"] + 1
+       set_data(data)
+      else:
+       break
+     if len(messages_to_import):
+      defer_import_messages(test_mode)
+
+def defer_import_messages(test_mode):
+ deferred.defer(import_message_history_import_async, test_mode, _countdown=300)
+
+class ImportMessageHistory(webapp2.RequestHandler):
+ def get(self):
+  defer_import_messages(self.request.get("test") == "1")   
+
+class PrintMemcachePage(webapp2.RequestHandler):
+ def get(self):
+  self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
+  self.response.write(to_json(memcache.get("application-data") or {}, indent = True))
+
 class StaticFormPage(webapp2.RequestHandler):
  def get(self):
   self.response.headers["Content-Disposition"] = \
@@ -1144,11 +1159,6 @@ class ViewReportsPage(webapp2.RequestHandler):
   reports = db_util.fetch_reports(test_mode, count)
   write(self, "view-reports.html", {"reports": reports})   
 
-class PrintMemcachePage(webapp2.RequestHandler):
- def get(self):
-  self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
-  self.response.write(to_json(memcache.get("application-data") or {}, indent = True))
-
 class AddMessagePage(webapp2.RequestHandler):
  def get(self):
   write(self, "add-message.html", {})
@@ -1161,16 +1171,48 @@ class AddMessagePage(webapp2.RequestHandler):
   test_mode = self.request.get("test") == "on"
   db_util.save_message(test_mode, sender, recipient, content, notified, timestamp = timestamp)
   write(self, "add-message.html", {"message": "Added."})
-  
 
-class HandleXMPPPresence(webapp2.RequestHandler):
- def post(self):
-  pass
+sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
+email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
+invalid_email_receiver_pattern = re.compile("[^a-zA-Z-_]")
+class ProcessMailPage(InboundMailHandler):
+ def receive(self, message):
+  sender = sender_email_pattern.sub("\\2", message.sender)
+  recipient = email_receiver_pattern.sub("\\1", message.to)
+  if invalid_email_receiver_pattern.match(recipient) or \
+     not sender in user_details.users or not recipient in user_details.users:
+   return
+  user = user_details.users[sender]["internal-name"]
+  recipient = user_details.users[recipient]["internal-name"]
+  for content_type, body in message.bodies("text/plain"):
+   sent = send_message(False, False, user, recipient, body.decode(), True)
+   if not sent:
+    send_email(sender, "Error!", "Sorry! The message was not sent.")
+   else:
+    send_email(sender, "Success!", "Sent.")
+   break
+
+class SendCommandPage(webapp2.RequestHandler):
  def get(self):
-  pass
+  self.post()
+ def post(self):
+  test_mode = self.request.get("test") == "1"
+  recipient = self.request.get("to")
+  command = self.request.get("command")
+  variables = {}
+  variables["to"] = recipient
+  write(self, "send-command.html", variables)
+  if recipient and command:
+   send_channel_message(
+    test_mode, recipient,
+    to_json(
+     {
+      "type": "command",
+      "value": command
+     }))
 
 #def main():
-handler = webapp2.WSGIApplication(
+handleList = \
  [
   ("/converse", ConversePage),
   ("/sign-out", SignOutPage),
@@ -1199,8 +1241,12 @@ handler = webapp2.WSGIApplication(
   ("/view-reports", ViewReportsPage),
   ("/add-message", AddMessagePage),
   ProcessMailPage.mapping()
- ],
- debug = DEV_MODE)
+ ]
+
+if DEV_MODE:
+ handleList.append(("/send-command", SendCommandPage))
+
+handler =  webapp2.WSGIApplication(handleList, debug = DEV_MODE)
  #util.run_wsgi_app(handler)
 
 #if __name__ == "__main__":

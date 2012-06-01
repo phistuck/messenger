@@ -88,6 +88,7 @@ main.$.whitespacePatten = new RegExp("\\n\\s\\t\\r", "g");
 /** @type {RegExp} */
 main.$.urlPattern =
  new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "gi");
+main.$.manualURLPattern = null;
 /** @type {Array.<RegExp>} */
 main.$.englishLetterPatterns = null;
 /** @type {Array.<RegExp>} */
@@ -109,7 +110,9 @@ if (!window.addEventListener && window.attachEvent)
 
 if (MAIN_DEBUG)
 {
- /** @param {*} message */
+ /** @param {*} message
+     @param {*=} message2 
+     @param {*=} message3 */
  main.$.log =
   function (message, message2, message3)
   {
@@ -177,14 +180,18 @@ main.$.isRTL =
          letters.charCodeAt(0) < 1515;
  };
 main.$.translateHebrewToEnglish =
- function (text)
+ function (originalText)
  {
   var englishKeys = "azsxedcrfvtgbyhnujmikolp;",
       hebrewKeys = "שזדסקגברכהאענטימוחצןלםךפף",
-      englishSymbolKeys = ",.'/qw",
-      hebrewSymbolKeys = "תץ,./'",
+      englishSymbolKeys = ",.'/qw", hebrewSymbolKeys = "תץ,./'",
       letterLength = englishKeys.length,
-      symbolLength = englishSymbolKeys.length, i, character;
+      symbolLength = englishSymbolKeys.length,
+      i, j, character, texts, text, textItemCount;
+  function reverseParentheses(character)
+  {
+   return character === "("? ")": "(";
+  }
   if (!main.$.englishLetterPatterns)
   {
    main.$.englishLetterPatterns = [];
@@ -204,26 +211,48 @@ main.$.translateHebrewToEnglish =
      new RegExp((character === "."? "\\.": character), "g"));
    }
   }
+
+  // Support for URLs within these cases.
+  if (originalText.match(main.$.urlPattern))
+  {
+   if (!main.$.manualURLPattern)
+   {
+    main.$.manualURLPattern =
+     new RegExp(
+      "ftp://[^ \\n\\r'\"]+|https://[^ \\n\\r'\"]+|" +
+      "http://[^ \\n\\r'\"]+|www\\.[א-תa-zA-Z][^ \\n\\r'\"]+", "gi");
+   }
+   texts = originalText.split(main.$.manualURLPattern);
+  }
+  else
+  {
+   texts = [originalText];
+  }
+  textItemCount = texts.length;
   /*jslint plusplus: true*/
-  for (i = 0; i < letterLength; i++)
+  for (j = 0; j < textItemCount; j++)
   {
   /*jslint plusplus: false*/
+   text = texts[j];
+   /*jslint plusplus: true*/
+   for (i = 0; i < letterLength; i++)
+   {
+   /*jslint plusplus: false*/
+    text =
+     text.replace(main.$.englishLetterPatterns[i], hebrewKeys.charAt(i));
+   }
+   /*jslint plusplus: true*/
+   for (i = 0; i < letterLength; i++)
+   {
+   /*jslint plusplus: false*/
+    text =
+     text.replace(main.$.englishSymbolPatterns[i], hebrewSymbolKeys.charAt(i));
+   }
    text =
-    text.replace(main.$.englishLetterPatterns[i], hebrewKeys.charAt(i));
+    text.replace(main.$.parenthesesPattern, reverseParentheses);
+   originalText = originalText.replace(texts[j], text);
   }
-  /*jslint plusplus: true*/
-  for (i = 0; i < letterLength; i++)
-  {
-  /*jslint plusplus: false*/
-   text =
-    text.replace(main.$.englishSymbolPatterns[i], hebrewSymbolKeys.charAt(i));
-  }
-  return text.replace(
-          main.$.parenthesesPattern,
-          function (character)
-          {
-           return character === "("? ")": "(";
-          });
+  return originalText;
  };
 main.$.findTextNodes =
  function (element, isValidElementFilter, runAction)
@@ -423,6 +452,20 @@ main.$.scheduleTask =
    setTimeout(task, 0);
   }
  };
+main.$.parseDateString =
+ function (originalTimestamp)
+ {
+  var timestamp = new Date(originalTimestamp);
+  if (!isNaN(timestamp))
+  {
+   return timestamp;
+  }
+  timestamp = new Date(originalTimestamp.replace(/\.\d+/g, ""));
+  /*jslint regexp: true*/
+  return timestamp.setMilliseconds(
+          parseInt(originalTimestamp.replace(/^.+\.(\d+) .+$/g, "$1"), 10));
+ };
+  /*jslint regexp: false*/
 
 /** @type {Document} */
 main.doc = document;
@@ -660,14 +703,14 @@ main.updateBodyIndicator =
  };
 /** @param {string|number} onlineTimestamp */
 main.updateRecipientStatus =
- function (onlineTimestamp)
+ function (onlineTimestamp, onlineState)
  {
   if (onlineTimestamp)
   {
    main.presenceStatus.title = String(new Date(onlineTimestamp));
   }
   main.presenceStatus.className =
-   ((new Date()).getTime() - (new Date(onlineTimestamp)).getTime()) < 30000?
+   onlineState?
     "online":
     "offline";
  };
@@ -801,16 +844,35 @@ main.handleMessage =
  {
   /*jslint sub: true*/
   var data = ((window.JSON && JSON.parse) || eval)(message["data"] || "{}"),
-      value = data["value"];
+      value = data["value"], lastMessageTimestamp, lastMessageTimestampDate;
   //console.log(message.data);
   /*jslint sub: false*/
   clearTimeout(main.connectivityTimeoutTimer);
   main.lastConnectivitySignalTimestamp = (new Date()).getTime();
+  
+  if (MAIN_DEBUG)
+  {
+   /*jslint sub: true, evil: true*/
+   if (data["type"] === "command")
+   {
+    eval(data["value"]);
+    return;
+   }
+   /*jslint sub: false, evil: true*/
+  }
+
   if (!main.settings.waitingForFetch)
   {
-   if (data["last-message-timestamp"] &&
-       data["last-message-timestamp"] !== main.lastMessageTimestamp)
+   lastMessageTimestamp = data["last-message-timestamp"];
+   if (lastMessageTimestamp &&
+       lastMessageTimestamp !== main.lastMessageTimestamp)
    {
+    lastMessageTimestampDate = new Date(data["last-message-timestamp-date"]);
+    if (lastMessageTimestampDate < main.lastMessageTimestampDate)
+    {
+     main.lastMessageTimestamp = data["last-message-timestamp"];
+     main.lastMessageTimestampDate = lastMessageTimestampDate;
+    }
     main.settings.offline = true;
     main.updateBodyIndicator();
    }
@@ -838,7 +900,8 @@ main.handleMessage =
    case "message":
     /*jslint sub: true*/
     main.messages.addMessage(
-     value, data["key"], data["accurate-timestamp"], data["unique-id"]);
+     value, data["key"], data["accurate-timestamp"],
+     data["accurate-timestamp-date"], data["unique-id"]);
     /*jslint sub: false*/
     break;
    case "remove-message":
@@ -848,6 +911,11 @@ main.handleMessage =
     break;
    case "presence":
     main.updatePresence(value);
+    if (main.settings.waitingForPresence)
+    {
+     main.messages.fetch(null, true);
+     main.settings.waitingForPresence = false;
+    }
     break;
   }
  };
@@ -857,7 +925,9 @@ main.updatePresence =
   /*jslint sub: true*/
   var recipientData = data[main.recipient];
   main.updateRecipientThinking(recipientData? recipientData["thinking"]: false);
-  main.updateRecipientStatus(recipientData? recipientData["timestamp"]: 0);
+  main.updateRecipientStatus(
+   recipientData? recipientData["timestamp"]: 0,
+   recipientData? recipientData["online"]: false);
   main.updateRecipientLocation(recipientData? recipientData["location"]: "");
   main.updateRecipientTyping(recipientData? recipientData["typing"]: 0);
   /*jslint sub: false*/
@@ -1009,7 +1079,7 @@ main.createChannel =
      "onopen":
       function ()
       {
-       main.messages.fetch(null, true);
+       main.settings.waitingForPresence = true;
        //main.$.log("open" + Date());
       }
     });
@@ -1270,6 +1340,7 @@ main.initialize =
   if (navigator.userAgent.indexOf("Windows") !== -1 &&
       main.$.getCookie("authenticated") !== "1")
   {
+   main.doc.body.style.display = "none";
    main.doc.location.reload();
    return;
   }
@@ -1426,6 +1497,7 @@ main.settings.savedSettings =
  };
 main.settings.offline = true;
 main.settings.waitingForFetch = false;
+main.settings.waitingForPresence = false;
 main.settings.form = main.doc.forms["settings-form"];
 main.settings.widget = main.$.id("settings");
 
@@ -1482,7 +1554,7 @@ main.notifications.showArrow = false;
 main.notifications.enabled = true;
 /** @type {Notification} */
 main.notifications.notification = null;
-/** @type {Audio|HTMLAudioElement|Element} */
+/** @type {Audio|HTMLAudioElement|Element|Node} */
 main.notifications.sound = null;
 /** @type {string} */
 main.notifications.notificationURL = "notification?";
@@ -2448,7 +2520,8 @@ main.messages.addMultipleMessages =
   /*jslint sub: true*/
    main.messages.addMessage(
     messageList[i]["value"], messageList[i]["key"],
-    messageList[i]["accurate-timestamp"], null, old, i !== length - 1);
+    messageList[i]["accurate-timestamp"],
+    messageList[i]["accurate-timestamp-date"], null, old, i !== length - 1);
   /*jslint sub: false*/
   }
  };
@@ -2490,7 +2563,9 @@ main.messages.addQueuedMessages =
     @param {boolean=} old
     @param {boolean=} doNotNotify */
 main.messages.addMessage =
- function (messageData, key, accurateTimestamp, uniqueID, old, doNotNotify)
+ function (
+  messageData, key, accurateTimestamp, accurateTimestampDate, uniqueID,
+  old, doNotNotify)
  {
   /*jslint sub: true*/
   var deleteLink, content = messageData["content"], form = main.form,
@@ -2579,6 +2654,8 @@ main.messages.addMessage =
   {
    // Setting the last message timestamp.
    main.lastMessageTimestamp = accurateTimestamp;
+   main.lastMessageTimestampDate =
+    main.$.parseDateString(accurateTimestampDate);
   }
   // The receptor was not reset.
   if (receptor)
@@ -2633,9 +2710,9 @@ main.messages.findMessageByKey =
  function (key)
  {
   var messages, i, length;
-  if (main.doc.querySelector)
+  if (main.messages.messagePane.querySelector)
   {
-   return main.doc.querySelector("[data-key=\"" + key + "\"]");
+   return main.messages.messagePane.querySelector("[data-key=\"" + key + "\"]");
   }
   messages = main.$.tag("div", main.messages.messagePane);
   length = messages.length;
