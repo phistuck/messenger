@@ -1,6 +1,6 @@
 application: messenger
 
-version: 0-0-1-10
+version: 0-0-1-11
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -29,6 +29,11 @@ handlers:
 - url: /favicon\.ico
   static_files: images/favicon.ico
   upload: images/favicon\.ico
+  mime_type: image/vnd.microsoft.icon
+  expiration: 365d
+- url: /images/new-message-icon\.ico
+  static_files: images/new-message-icon.ico
+  upload: images/new-message-icon\.ico
   mime_type: image/vnd.microsoft.icon
   expiration: 365d
 - url: /resources/notification\.mp3

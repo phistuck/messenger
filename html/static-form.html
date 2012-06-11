@@ -7,17 +7,213 @@
         content="width=device-width; initial-scale=1.0; maximum-scale=1;
                  minimum-scale=1; user-scalable=0;"/>
   <style type="text/css">
-   body, input { font: normal 1em "Arial"; }
+   body, input
+   {
+    font: normal 1em "Arial";
+    margin: 0;
+    padding: 0;
+    text-align: center;
+   }
+   input[type=text]
+   {
+    text-align: initial;
+   }
+   .ios input[type=text]
+   {
+    width: 85%;
+    font-size: 20px;
+    padding: 3px;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    border: 1px gray solid;
+    outline: 0;
+   }
+   .ios input[type=che1ckbox]
+   {
+    -webkit-appearance: none;
+    appearance: none;
+   }
+   .ios input[type=ch1eckbox]::before
+   {
+    content: "on";
+    width: 20px;
+    display: inline-block;
+    border-radius: 5px 0 0 5px;
+    background: gray;
+   }
+   .ios input[type=chec1kbox]::after
+   {
+    content: "off";
+    width: 20px;
+    display: inline-block;
+    border-radius: 0 5px 5px 0;
+    background: gray;
+   }
    form { display: inline; }
+   .ios body
+   {
+    background-color: #cdd5dd;
+    background-image: -webkit-linear-gradient(0deg, #c6cdd8 65%, transparent 65%, transparent);
+    background-image: linear-gradient(0deg, #c6cdd8 65%, transparent 65%, transparent);
+    background-size: 7px 7px;
+   }
+   .ios h1
+   {
+    background-color: #b2bbca;
+    background-image: -webkit-linear-gradient(top, #b0bccd, #889bb3 50%, #8195af 51%, #6d84a2);
+    background-image: linear-gradient(top, #b0bccd, #889bb3 50%, #8195af 51%, #6d84a2);
+    background-clip: padding-box;
+    background-size: 1px 100%;
+    background-repeat: repeat-x;
+    border-top: 1px solid #cdd5df;
+    border-bottom: 1px solid #2e3744;
+    border-left: 0;
+    border-right: 0;
+    color: white;
+    text-shadow: rgba(0,0,0,.4) 0 -1px 0;
+    font-size: 20px;
+    line-height: 26px;
+    font-family: "Helvetica", "Arial";
+    text-align: center;
+    padding: 8px 0 10px 0;
+    margin: 0;
+   }
+   .ios input[type=submit]
+   {
+    z-index: 1;
+    position: fixed;
+    left: auto;
+    right: 55%;
+    bottom: 15px;
+    width: 30%;
+    border-radius: 5px;
+    height: 50px;
+    background-image: -webkit-linear-gradient(top, #6d84a2,  #8195af 50%, #889bb3 51%, #b0bccd);
+    background-image: linear-gradient(top, #6d84a2,  #8195af 50%, #889bb3 51%, #b0bccd);
+    border: 1px solid rgba(70, 20, 159, 0.3);
+    color: white;
+    text-shadow: rgba(0,0,0,.4) 0 -1px 0;
+    font-size: 20px;
+   }
+   .ios input[type=submit].ping
+   {
+    right: auto;
+    left: 55%;
+   }
+   /* A fork of http://css-tricks.com/the-checkbox-hack/ */
+   .ios input[type=checkbox]::after
+   {
+    content: '';
+    margin: 0; 
+    padding: 0;
+    width: 39px;
+    height: 25px;
+    background: -webkit-linear-gradient(top, #cdcdcd, #fbfbfb);
+    background: linear-gradient(top, #cdcdcd, #fbfbfb);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 #f0f0f0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px solid #919191;
+    -webkit-transition: 1s all linear;
+    transition: 1s all linear;
+   }
+   .ios input[type=checkbox]::before
+   {
+    content: 'OFF';
+    margin: 0; 
+    padding: 0;
+    width: 55px;
+    height: 25px;
+    background: -webkit-linear-gradient(top, #cfcfcf, #efefef 50%, #f9f9f9 50%, #fefefe);
+    background: linear-gradient(top, #cfcfcf, #efefef 50%, #f9f9f9 50%, #fefefe);
+    border-radius: 3px;
+    border: 1px solid #7d7d7d;
+    box-shadow: inset 0 2px 2px #b6b6b6,
+                inset 3px 0 3px #b6b6b6;
+    color: #7f7f7f;
+    text-align: center;
+    font: 700 14px sans-serif; 
+    text-shadow: 0;
+    line-height: 27px;
+    position: absolute;
+    top: 0;
+    left: 37px;
+   }
+   .ios input[type=checkbox]
+   {
+    -webkit-appearance: none;
+    margin: 10px auto; 
+    padding: 0;
+    display: inline-block;
+    vertical-align: middle;
+    width: 94px;
+    height: 27px;
+    position: relative;
+    border-radius: 3px 0 0 3px;
+    -webkit-transition: 1s all linear;
+    transition: 1s all linear;
+   }
+   .ios input[type=checkbox]:checked::after
+   {
+    left: 53px;
+   }
+   .ios input[type=checkbox]:checked::before
+   {
+    content: 'ON';
+    left: 0;
+    background: -webkit-linear-gradient(top, #3672dc, #4085ec 50%, #4d8fef 50%, #76adfc);
+    background: linear-gradient(top, #3672dc, #4085ec 50%, #4d8fef 50%, #76adfc);
+    text-shadow: 0 -1px 0 #1b3b6f;
+    box-shadow: inset 0 2px 2px #2a5bb3,
+                inset -3px 0 3px #2a5bb3;
+    color: #fff;
+    border-color: #1654b5;
+   }
+   /* End of a fork of http://css-tricks.com/the-checkbox-hack/ */
+   .ios LABEL span
+   {
+    position: relative;
+    font-weight: bold;
+    display: inline-block;
+   }
+   .bottom
+   {
+    display: none;
+   }
+   .ios .bottom
+   {
+    position: fixed;
+    width: 100%;
+    height: 80px;
+    background: #000;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    display: block;
+    z-index: 0;
+    background-image: -webkit-linear-gradient(top, #b0bccd, #889bb3 50%, #8195af 51%, #6d84a2);
+    background-image: linear-gradient(top, #b0bccd, #889bb3 50%, #8195af 51%, #6d84a2);
+   }
+   
   </style>
+  <script>
+   if (navigator.userAgent.toLowerCase().match(/\bios\b|iphone os|iphone|ipad/g))
+   {
+    document.documentElement.className = "ios";
+   }
+  </script>
  </head>
  <body>
+  <h1>Form</h1>
+  <br/>
   <form method="post" action="{{ action }}">
    <input type="hidden" name="from" value="{{ from }}"/>
    <input type="hidden" name="to" value="{{ to }}"/>
    <input type="text" name="content" autocomplete="off"
-          autofocus="autofocus"/><br/>
-   <input type="checkbox" checked="checked" name="notify"/> Alert<br/>
+          dir="auto" autofocus="autofocus"/><br/>
+   <label><input type="checkbox" checked="checked" name="notify"/> <span>Alert</span></label><br/>
    <input type="hidden" name="static-form" value="1"/>
    <input type="submit" value="Submit"/>
   </form>
@@ -27,7 +223,8 @@
    <input type="hidden" name="notify" value="on"/>
    <input type="hidden" name="content" value="Ping."/>
    <input type="hidden" name="static-form" value="1"/>
-   <input type="submit" value="Ping"/>
+   <input type="submit" value="Ping" class="ping"/>
   </form>
+  <div class="bottom"></div>
  </body>
 </html>

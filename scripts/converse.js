@@ -452,6 +452,8 @@ main.$.scheduleTask =
    setTimeout(task, 0);
   }
  };
+/** @param {string} originalTimestamp
+    @return {Date} */
 main.$.parseDateString =
  function (originalTimestamp)
  {
@@ -462,8 +464,9 @@ main.$.parseDateString =
   }
   timestamp = new Date(originalTimestamp.replace(/\.\d+/g, ""));
   /*jslint regexp: true*/
-  return timestamp.setMilliseconds(
-          parseInt(originalTimestamp.replace(/^.+\.(\d+) .+$/g, "$1"), 10));
+  timestamp.setMilliseconds(
+   parseInt(originalTimestamp.replace(/^.+\.(\d+) .+$/g, "$1"), 10))
+  return timestamp;
  };
   /*jslint regexp: false*/
 
@@ -560,7 +563,37 @@ main.typing = false;
 main.recipientThinking = false;
 /** @type {?string} */
 main.userName = null;
+/** @const   
+    @type {string} */
+main.normalIcon = "/favicon.ico";
+/** @const   
+    @type {string} */
+main.newMessageIcon = "/images/new-message-icon.ico";
+/** @type {string} */
+main.currentIcon = main.normalIcon;
+/** @type {HTMLLinkElement} */
+main.eIcon = null;
 
+main.updateIcon =
+ function (newMessage)
+ {
+  if (!main.eIcon)
+  {
+   main.eIcon = main.$.createElement("link");
+   main.eIcon.setAttribute("rel", "icon");
+   main.eIcon.setAttribute("href", main.currentIcon);
+   main.eIcon.setAttribute("type", "image/x-icon");
+   main.eIcon =
+    main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild);
+  }
+  main.currentIcon =
+   main.eIcon.href = newMessage? main.newMessageIcon: main.normalIcon;
+ };
+main.resetIcon =
+ function ()
+ {
+  main.updateIcon(false);
+ };
 main.toggleThinkingMode =
  function ()
  {
@@ -701,22 +734,24 @@ main.updateBodyIndicator =
   }
   main.body.className = classList.join(" ");
  };
-/** @param {string|number} onlineTimestamp */
+/** @param {string|number} onlineTimestamp
+    @param {number} serverTimestamp */
 main.updateRecipientStatus =
- function (onlineTimestamp, onlineState)
+ function (onlineTimestamp, serverTimestamp)
  {
   if (onlineTimestamp)
   {
    main.presenceStatus.title = String(new Date(onlineTimestamp));
   }
   main.presenceStatus.className =
-   onlineState?
+    (serverTimestamp - (new Date(onlineTimestamp)).getTime()) < 40000?
     "online":
     "offline";
  };
-/** @param {string|number} typingTimestamp */
+/** @param {string|number} typingTimestamp
+    @param {number=} serverTimestamp */
 main.updateRecipientTyping =
- function (typingTimestamp)
+ function (typingTimestamp, serverTimestamp)
  {
   var typing;
   function updateTyping(typing)
@@ -732,7 +767,8 @@ main.updateRecipientTyping =
   clearTimeout(main.recipientTypingTimeoutTimer);
   
   typing =
-   ((new Date()).getTime() - (new Date(typingTimestamp)).getTime()) < 7000;
+   serverTimestamp &&
+   ((serverTimestamp - (new Date(typingTimestamp)).getTime()) < 7000);
   
   updateTyping(typing);
 
@@ -910,7 +946,7 @@ main.handleMessage =
     /*jslint sub: false*/
     break;
    case "presence":
-    main.updatePresence(value);
+    main.updatePresence(value, data["server-timestamp"]);
     if (main.settings.waitingForPresence)
     {
      main.messages.fetch(null, true);
@@ -920,16 +956,17 @@ main.handleMessage =
   }
  };
 main.updatePresence =
- function (data)
+ function (data, serverTimestampText)
  {
   /*jslint sub: true*/
-  var recipientData = data[main.recipient];
+  var recipientData = data[main.recipient],
+      serverTimestamp = main.$.parseDateString(serverTimestampText).getTime();
   main.updateRecipientThinking(recipientData? recipientData["thinking"]: false);
   main.updateRecipientStatus(
-   recipientData? recipientData["timestamp"]: 0,
-   recipientData? recipientData["online"]: false);
+   recipientData? recipientData["timestamp"]: 0, serverTimestamp);
   main.updateRecipientLocation(recipientData? recipientData["location"]: "");
-  main.updateRecipientTyping(recipientData? recipientData["typing"]: 0);
+  main.updateRecipientTyping(
+   recipientData? recipientData["typing"]: 0, serverTimestamp);
   /*jslint sub: false*/
  };
 /** @param {Element} receptor
@@ -980,7 +1017,7 @@ main.clearDialog =
   }
   main.dialog.style.display = "none";
   main.dialog.innerHTML = "";
-  document[main.$.removeEventString](
+  main.doc[main.$.removeEventString](
    main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
 main.handleClicks =
@@ -1651,7 +1688,7 @@ main.notifications.show =
   }
   if (main.desktop)
   {
-   document.title = "New Message - Notify";
+   main.doc.title = "New Message - Notify";
   }
   else if (!main.settings.nativeDesktopNotifications())
   {
@@ -1848,8 +1885,8 @@ main.messages.newRequestRetries = 1;
 main.messages.receptor = main.$.id("message-receptor");
 /** @type {Element} */
 main.messages.olderMessageReceptor = main.$.id("older-message-receptor");
-/** @type {Element} */
-main.messages.offlineReceptor = main.$.id("offline-message-receptor");
+//** @type {Element} */
+//main.messages.offlineReceptor = main.$.id("offline-message-receptor");
 /** @type {Element} */
 main.messages.messagePane = main.$.id("message-pane");
 /** @type {XMLHttpRequest|ActiveXObject} */
@@ -1938,6 +1975,7 @@ main.messages.confirmRead =
   button.className = "hidden";
   main.messages.receptor = main.replaceReceptor(main.messages.receptor);
   main.doc.title = main.doc.originalTitle;
+  main.resetIcon();
   /*jslint eqeq: true*/
   if (this === button)
   {
@@ -1949,7 +1987,12 @@ main.messages.confirmRead =
 main.messages.glow =
  function ()
  {
-  main.doc.title = String((parseInt(main.doc.title, 10) || 0) + 1);
+  var number = parseInt(main.doc.title, 10);
+  main.doc.title = String(number + 1);
+  if (number % 3 === 0)
+  {
+   main.updateIcon(main.currentIcon === main.normalIcon);
+  }
  };
 main.messages.copyConcealedMessage =
  function ()
@@ -2067,7 +2110,7 @@ main.messages.notify =
   }
   if (main.desktop)
   {
-   document.title = "New Message";
+   main.doc.title = "New Message";
   }
   else
   {
@@ -2532,7 +2575,7 @@ main.messages.addQueuedMessages =
   var i;
   main.settings.offline = false;
   main.updateBodyIndicator();
-  main.messages.offlineReceptor.innerHTML = "";
+  //main.messages.offlineReceptor.innerHTML = "";
   if (main.wasAtScrollBottom)
   {
    window.scrollBy(0, -1);
@@ -2628,29 +2671,14 @@ main.messages.addMessage =
    // Previous messages go to the previous message receptor.
    receptor = main.messages.olderMessageReceptor;
   }
-  // This stupid feature is suspected to have eaten messages.
-  // We cannot really know that no other message was supposed to be received.
-  /*// This message was sent by the current user
-  // and no other message was recieved yet.
-  else if (!received &&
-           !receptor.children.length &&
-           !main.messages.offlineReceptor.children.length)
-  {
-   // Inserting the message above the receptor.
-   main.messages.messagePane.insertBefore(message, receptor);
-   // Removing the reference to the receptor in order not to add to it.
-   receptor = null;
-   // Setting the last message timestamp.
-   main.lastMessageTimestamp = accurateTimestamp;
-  }*/
   // We are offline.
-  else if (main.settings.offline)
-  {
+  //else if (main.settings.offline)
+  //{
    // New messages in offline mode go to the offline receptor.
-   receptor = main.messages.offlineReceptor;
-  }
+   //receptor = main.messages.offlineReceptor;
+  //}
   // Normal message.
-  else
+  else if (!main.settings.offline)
   {
    // Setting the last message timestamp.
    main.lastMessageTimestamp = accurateTimestamp;

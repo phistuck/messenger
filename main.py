@@ -340,6 +340,7 @@ def update_presence_state(
      {
       "type": "presence",
       "value": active_users,
+      "server-timestamp": MillisecondTimestamp(datetime.now()),
       "last-message-timestamp": last_message_timestamp.isoformat(),
       "last-message-timestamp-date": MillisecondTimestamp(last_message_timestamp)
      })
@@ -348,6 +349,7 @@ def update_presence_state(
   to_json(
    {
     "type": "presence",
+    "server-timestamp": MillisecondTimestamp(datetime.now()),
     "value": active_users
    })
  for active_user in active_users:
