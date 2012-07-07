@@ -465,7 +465,7 @@ main.$.parseDateString =
   timestamp = new Date(originalTimestamp.replace(/\.\d+/g, ""));
   /*jslint regexp: true*/
   timestamp.setMilliseconds(
-   parseInt(originalTimestamp.replace(/^.+\.(\d+) .+$/g, "$1"), 10))
+   parseInt(originalTimestamp.replace(/^.+\.(\d+) .+$/g, "$1"), 10));
   return timestamp;
  };
   /*jslint regexp: false*/
@@ -631,13 +631,13 @@ main.handleGlobalShortcuts =
   alt = e.altKey;
   control = e.ctrlKey;
 
-  // Alt+b toggles the concealment of the content.
+  // Ctrl+b or Alt+b toggles the concealment of the content.
   if ((control || alt) && key === 66)
   {
    main.toggleConcealmentMode();
   }
   // F2 toggles new message notifications.
-  else if (key === 113)
+  else if (key === 113 || (key === 229 && e.keyIdentifier === "U+000008"))
   {
    if (main.newMessages)
    {
@@ -1136,6 +1136,25 @@ main.createChannel =
   socket.onmessage = main.handleMessage;
  };
 main.reclaimToken =
+ function ()
+ {
+  function recreateChannel()
+  {
+   try
+   {
+    main.releaseSocket();
+    main.socket.close();
+   }
+   catch (e)
+   {
+   }
+   // TODO - figure out a way to know this token has expired
+   // and for those cases, use the old reclaiming logic.
+   main.createChannel();
+  }
+  main.$.scheduleTask(recreateChannel);
+ };
+main.oldReclaimToken =
  function ()
  {
   var /*iFrame = main.$.firstTag("iframe"), */request;
@@ -2007,8 +2026,8 @@ main.messages.handleMessageFieldKeyUp =
   if (main.messageField.value.length)
   {
    main.updatePresenceData(true);
-   main.messages.lastTypedMessage = main.messageField.value;
   }
+  main.messages.lastTypedMessage = main.messageField.value;
  };
 /** @param {Event} e
     @return {?boolean|undefined} */
@@ -2388,6 +2407,9 @@ main.messages.send =
     main.showDialog(element, true);
     defaultButton.focus();
    };
+
+  main.messages.lastTypedMessage = "";
+
   if (!message.match(main.messages.onlyHebrewLettersPattern) &&
       message.replace(main.messages.whitelistEnglishPattern, "")
       .match(main.messages.normalHebrewAsEnglishPattern))

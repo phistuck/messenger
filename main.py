@@ -41,6 +41,8 @@ def secure(self, no_cache = False):
   self.response.headers["Cache-Control"] = "no-cache"
   self.response.headers["Pragma"] = "no-cache"
   self.response.headers["Expires"] = "-1"
+ else:
+  self.response.headers["Vary"] = "Accept-Encoding"
 
 def write(self, file_name):
  write(self, file_name, {})
@@ -466,7 +468,7 @@ class ConversePage(webapp2.RequestHandler):
 
 class SignOutPage(webapp2.RequestHandler):
  def get(self):
-  secure(self)
+  secure(self, no_cache = True)
   self.response.headers["Set-Cookie"] = "authenticated=0"
   self.redirect("/redirect-to-converse")
 
@@ -682,6 +684,8 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
 
 class HandleXMPPPresence(webapp2.RequestHandler):
  def post(self):
+  import logging
+  logging.debug(self.request.get("from").split("/")[0])
   pass
  def get(self):
   pass
