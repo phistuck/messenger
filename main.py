@@ -233,8 +233,10 @@ def send_message(
   notify_recipient(recipient)
  try:
   message = db_util.save_message(test_mode, user, recipient, content, notify)
+  message_key = str(message.key())
   if not content:
-   return True
+   return (True, message_key)
+
   (data, users_data) = get_data("users-data", {}, data = data)
   (data, history_data) = get_data("history-data", {}, data = data)
   get_set_history_data(data, user, recipient)
@@ -255,7 +257,7 @@ def send_message(
      "last-message-timestamp": iso_formatted_last_message,
      "last-message-timestamp-date": last_message,
      "unique-id": unique_id,
-     "key": str(message.key()),
+     "key": message_key,
      "type": "message"
     })
   send_channel_message(test_mode, recipient, message_json)
@@ -272,10 +274,10 @@ def send_message(
    user_data["last-read-message-timestamp"] = \
     (datetime.now() - timedelta(seconds = 1))
    set_data(data)
-  return True
+  return (True, message_key)
  except (db.NotSavedError, db.Timeout, apiproxy_errors.DeadlineExceededError):
   if not dynamic:
-   return False
+   return (False, "")
   else:
    raise "Error"
 
@@ -464,6 +466,7 @@ class ConversePage(webapp2.RequestHandler):
   variables["application_version"] = APPLICATION_VERSION;
   variables["first_message_timestamp"] = message_timestamp_offsets["first"]
   variables["last_message_timestamp"] = message_timestamp_offsets["last"]
+  variables["windows"] = user_details.is_windows(self.request.headers)
   write(self, "converse.html", variables)
 
 class SignOutPage(webapp2.RequestHandler):
@@ -505,13 +508,16 @@ class SendMessagePage(webapp2.RequestHandler):
   if content and static_form_mode:
    content += "\n(Sent from the static page)"
   notify = self.request.get("notify") == "on"
-  sent = send_message( \
-   test_mode, dynamic, user, recipient, content, notify,
-   data = data, unique_id = unique_id)
+  (sent, message_key) = \
+   send_message( \
+    test_mode, dynamic, user, recipient, content, notify,
+    data = data, unique_id = unique_id)
   if save_data:
    set_data(data)
   status = "Sent." if sent else "Not sent."
-  if static_form_mode and not sent:
+  if dynamic and sent:
+   self.response.write(to_json({"key": message_key}))
+  elif static_form_mode and not sent:
    self.response.write(
     "<!doctype html><span style=\"font-family: Arial;\">" +
     "Oops! Something went wrong and the message was probably not sent. " +
@@ -666,7 +672,8 @@ class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
   if available_time:
    update_xmpp_state(available_time)
   if transmit_message:
-   sent = send_message(False, False, jid, recipient, body, False, data = data)
+   (sent, temp) = \
+    send_message(False, False, jid, recipient, body, False, data = data)
    if is_xmpp_user_available(user, data = data) and sent:
     message.reply("_Sent._")
    elif not sent and is_xmpp_user_available(user, data = data):
@@ -1179,6 +1186,7 @@ class AddMessagePage(webapp2.RequestHandler):
   write(self, "add-message.html", {"message": "Added."})
 
 sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
+# to+UserName@messenger.appspotmail.com
 email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
 invalid_email_receiver_pattern = re.compile("[^a-zA-Z-_]")
 class ProcessMailPage(InboundMailHandler):
@@ -1191,7 +1199,8 @@ class ProcessMailPage(InboundMailHandler):
   user = user_details.users[sender]["internal-name"]
   recipient = user_details.users[recipient]["internal-name"]
   for content_type, body in message.bodies("text/plain"):
-   sent = send_message(False, False, user, recipient, body.decode(), True)
+   (sent, temp) = \
+    send_message(False, False, user, recipient, body.decode(), True)
    if not sent:
     send_email(sender, "Error!", "Sorry! The message was not sent.")
    else:

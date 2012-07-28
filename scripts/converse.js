@@ -469,6 +469,18 @@ main.$.parseDateString =
   return timestamp;
  };
   /*jslint regexp: false*/
+main.$.parseJSON =
+ function (string)
+ {
+  try
+  {
+   return ((window.JSON && JSON.parse) || eval)(string);
+  }
+  catch (e)
+  {
+   return "";
+  }
+ };
 
 /** @type {Document} */
 main.doc = document;
@@ -571,7 +583,7 @@ main.normalIcon = "/favicon.ico";
 main.newMessageIcon = "/images/new-message-icon.ico";
 /** @type {string} */
 main.currentIcon = main.normalIcon;
-/** @type {HTMLLinkElement} */
+/** @type {HTMLLinkElement|Node} */
 main.eIcon = null;
 
 main.updateIcon =
@@ -859,7 +871,7 @@ main.updatePresenceData =
    setTimeout(
     function ()
     {
-     main.reclaimToken();
+     main.reopenChannel();
     },
     20000);
  };
@@ -879,7 +891,7 @@ main.handleMessage =
  function (message)
  {
   /*jslint sub: true*/
-  var data = ((window.JSON && JSON.parse) || eval)(message["data"] || "{}"),
+  var data = main.$.parseJSON(message["data"] || "{}"),
       value = data["value"], lastMessageTimestamp, lastMessageTimestampDate;
   //console.log(message.data);
   /*jslint sub: false*/
@@ -1124,18 +1136,27 @@ main.createChannel =
   socket.onclose =
    function ()
    {
-    main.reclaimToken();
+    main.reopenChannel();
     //main.$.log("close" + Date());
    };
   socket.onerror =
-   function ()
+   function (e, a, b, c)
    {
-    main.reclaimToken();
-    //main.$.log("error" + Date());
+    main.sendReport(
+     "channel-error",
+     [e, e.code, typeof e.code, e.description, a, b, c].join(","));
+    if (e && e.description.indexOf("Token time") > -1)
+    {
+     main.reclaimToken();
+    }
+    else
+    {
+     main.reopenChannel();
+    }
    };
   socket.onmessage = main.handleMessage;
  };
-main.reclaimToken =
+main.reopenChannel =
  function ()
  {
   function recreateChannel()
@@ -1148,13 +1169,11 @@ main.reclaimToken =
    catch (e)
    {
    }
-   // TODO - figure out a way to know this token has expired
-   // and for those cases, use the old reclaiming logic.
    main.createChannel();
   }
   main.$.scheduleTask(recreateChannel);
  };
-main.oldReclaimToken =
+main.reclaimToken =
  function ()
  {
   var /*iFrame = main.$.firstTag("iframe"), */request;
@@ -1344,6 +1363,7 @@ main.resizeFields =
   if (main.wasAtScrollBottom)
   {
    main.scrollToBottom();
+   main.$.scheduleTask(main.hideRedundantOutro);
   }
  };
 main.handleScroll =
@@ -1355,6 +1375,24 @@ main.handleScroll =
     ((main.body.scrollTop || main.html.scrollTop) +
      main.html.clientHeight) >
     (main.html.scrollHeight - 5);
+  }
+ };
+main.hideRedundantOutro =
+ function ()
+ {
+  var form = main.form, element = main.$.id("outro"), elementTop, formTop;
+  element.style.cssText = "";
+  if (element.getBoundingClientRect &&
+      form.getBoundingClientRect)
+  {
+   elementTop = parseInt(element.getBoundingClientRect().top, 10);
+   formTop = parseInt(form.getBoundingClientRect().top, 10);
+   if (elementTop < formTop)
+   {
+    element.style.height =
+     (parseInt(window.getComputedStyle(element, null).height, 10) -
+      (formTop - elementTop)) + "px";
+   }
   }
  };
 main.initialize =
@@ -1377,27 +1415,22 @@ main.initialize =
    }
    navigator.geolocation.getCurrentPosition(storeLocation);
   }
-  function hideRedundantOutro()
-  {
-   var form = main.form, element = main.$.id("outro"), elementTop, formTop;
-   if (element.getBoundingClientRect &&
-       form.getBoundingClientRect)
-   {
-    elementTop = parseInt(element.getBoundingClientRect().top, 10);
-    formTop = parseInt(form.getBoundingClientRect().top, 10);
-    if (elementTop < formTop)
-    {
-     element.style.height =
-      (parseInt(window.getComputedStyle(element, null).height, 10) -
-       (formTop - elementTop)) + "px";
-    }
-   }
-  }
   if (navigator.userAgent.indexOf("Windows") !== -1 &&
       main.$.getCookie("authenticated") !== "1")
   {
-   main.doc.body.style.display = "none";
    main.doc.location.reload();
+   return;
+  }
+  else
+  {
+   main.updateBodyIndicator();
+  }
+  // If there is no goog object, there is not point in staying here.
+  if (!window["goog"])
+  {
+   main.updateBodyIndicator();
+   main.showDialog(
+    "There is a problem with the service. Please, reload the page.");
    return;
   }
   if (navigator.geolocation)
@@ -1456,7 +1489,14 @@ main.initialize =
      for (i = 0, length = arguments.length; i < length; i++)
      {
      /*jslint plusplus: false*/
-      args += arguments[i];
+      try
+      {
+       args += JSON.stringify(arguments[i]);
+      }
+      catch (e)
+      {
+       args += arguments[i];
+      }
       //if (i !== (length - 1))
       //{
        args += ",";
@@ -1921,6 +1961,8 @@ main.messages.whitelistEnglishPattern =
  new RegExp("\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(https?://|www)[^ \"]+)\\b", "gi");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
+/** @type {Object.<function()>} */
+main.messages.sendMessageCallbacks = {};
 
 main.messages.clearAll =
  function ()
@@ -1931,37 +1973,47 @@ main.messages.clearAll =
     element.className += " hidden";
    });
  };
+/** @param {Event} e
+    @param {HTMLAnchorElement|Element|Node} dismissLink
+    @param {(Element|Node)=} message */
 main.messages.removeUndelivered =
- function (e, dismissLink)
+ function (e, dismissLink, message)
  {
-  var message;
-  main.$.preventDefault(e);
-  message = dismissLink.parentNode.parentNode;
-  if (message.className.indexOf("system-message") !== -1)
+  if (!message)
   {
-   message.parentNode.removeChild(message);
+   main.$.preventDefault(e);
+   message = dismissLink.parentNode.parentNode;
   }
+  if (message.className.indexOf("system-message") === -1)
+  {
+   return;
+  }
+  message.parentNode.removeChild(message);
  };
+/** @param {Event} e
+    @param {HTMLAnchorElement|Element|Node} resendLink */
 main.messages.resendUndelivered =
  function (e, resendLink)
  {
   var message;
   main.$.preventDefault(e);
   message = resendLink.parentNode.parentNode;
-  if (message.className.indexOf("system-message") !== -1)
+  if (message.className.indexOf("system-message") === -1)
   {
-   if (main.messageField.value &&
-       !confirm("You started typing a message. This will overwrite it. Right?"))
-   {
-    return;
-   }
-   main.messageField.value = message.originalMessage;
-   if (message.notify)
-   {
-    message.notify = main.notifyRecipient.checked;
-   }
-   main.messages.send();
+   return;
   }
+  if (main.messageField.value &&
+      !confirm("You started typing a message. This will overwrite it. Right?"))
+  {
+   return;
+  }
+  main.messageField.value = message.originalMessage;
+  if (message.notify)
+  {
+   message.notify = main.notifyRecipient.checked;
+  }
+  main.messages.send();
+  main.messages.removeUndelivered(e, resendLink, message);
  };
 main.messages.abortCheckerRequest =
  function ()
@@ -1995,10 +2047,8 @@ main.messages.confirmRead =
   main.messages.receptor = main.replaceReceptor(main.messages.receptor);
   main.doc.title = main.doc.originalTitle;
   main.resetIcon();
-  /*jslint eqeq: true*/
   if (this === button)
   {
-  /*jslint eqeq: false*/
    main.messageField.focus();
   }
   return false;
@@ -2006,12 +2056,14 @@ main.messages.confirmRead =
 main.messages.glow =
  function ()
  {
-  var number = parseInt(main.doc.title, 10);
-  main.doc.title = String(number + 1);
-  if (number % 3 === 0)
-  {
-   main.updateIcon(main.currentIcon === main.normalIcon);
-  }
+  // var number = parseInt(main.doc.title, 10);
+  // main.doc.title = String(number + 1);
+  // if (number % 3 === 0)
+  // {
+   // main.updateIcon(main.currentIcon === main.normalIcon);
+  // }
+  main.doc.title = String(parseInt(main.doc.title, 10) + 1);
+  main.updateIcon(main.currentIcon === main.normalIcon);
  };
 main.messages.copyConcealedMessage =
  function ()
@@ -2175,15 +2227,13 @@ main.messages.sendManually =
  {
   main.form.submit();
  };
-main.messages.sendMessageCallbacks = {};
-
 main.messages.send =
  function ()
  {
   var message = main.messageField.value, parameters, requestTimeout,
       indicateUndeliveredMessage, uniqueID, notify, request, retry = 0,
       resetTimer, resend, cleanup, sendMessage, stopRequest, translatedMessage,
-      prepareMessage, showConfirmationBox,
+      prepareMessage, showConfirmationBox, messageKey,
       /*translateDecision, */undeliveredTimeout;
   cleanup =
    function ()
@@ -2285,11 +2335,19 @@ main.messages.send =
     request.onreadystatechange =
      function ()
      {
+      var key;
+      if (!undeliveredTimeout)
+      {
+       return;
+      }
       if (request && request.readyState !== 4)
       {
        return;
       }
-      if (request && request.status !== 200)
+      /*jslint sub: true*/
+      key = main.$.parseJSON(request.responseText)["key"];
+      /*jslint sub: false*/
+      if ((request && request.status !== 200) || !key)
       {
        resend(true);
       }
@@ -2297,6 +2355,9 @@ main.messages.send =
       {
        cleanup();
        resetTimer();
+       messageKey = key;
+       main.messages.sendMessageCallbacks[messageKey] =
+        main.messages.sendMessageCallbacks[uniqueID];
       }
      };
     //request.onerror = main.messages.sendManually;
@@ -2343,8 +2404,12 @@ main.messages.send =
       function ()
       {
        resetTimer();
-       clearTimeout(undeliveredTimeout);
-       main.messages.sendMessageCallbacks[uniqueID] = undefined;
+       undeliveredTimeout = clearTimeout(undeliveredTimeout);
+
+       delete main.messages.sendMessageCallbacks[uniqueID];
+       delete main.messages.sendMessageCallbacks[messageKey];
+
+       cleanup();
       };
     }
     main.form.reset();
@@ -2644,7 +2709,11 @@ main.messages.addMessage =
       messageContent, receptor = main.messages.receptor;
   /*jslint sub: false*/
 
-  if (uniqueID && main.messages.sendMessageCallbacks[uniqueID])
+  if (key && main.messages.sendMessageCallbacks[key])
+  {
+   main.messages.sendMessageCallbacks[key]();
+  }
+  else if (uniqueID && main.messages.sendMessageCallbacks[uniqueID])
   {
    main.messages.sendMessageCallbacks[uniqueID]();
   }

@@ -14,7 +14,7 @@
                  minimum-scale=1; user-scalable=0;"/>
   <link href="css/converse.css" rel="stylesheet" type="text/css"/>
  </head>
- <body class="offline-mode{% if new_messages_mode %} new-messages{% endif %}">
+ <body class="{% if windows %}start-up {% endif %}offline-mode{% if new_messages_mode %} new-messages{% endif %}">
   <div class="intro"></div>
   <textarea id="concealed-message"></textarea>
   <div class="fetch-more-messages"><a data-action="fetch-more-messages"

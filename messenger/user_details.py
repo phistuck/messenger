@@ -41,6 +41,13 @@ def is_android_or_windows(headers):
   user_agent = headers["user-agent"].lower()
   return "android" in user_agent or "windows" in user_agent
 
+def is_windows(headers):
+ if not "user-agent" in headers:
+  return False
+ else:
+  user_agent = headers["user-agent"].lower()
+  return "windows" in user_agent
+
 def get_email(internal_name):
  if internal_name in users:
   return users[internal_name]["email"]

@@ -1,6 +1,6 @@
 application: messenger
 
-version: 0-0-1-12
+version: 0-0-1-13
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -11,6 +11,13 @@ handlers:
   upload: resources/homepage\.html
   mime_type: text/html
   expiration: 365d
+  http_headers:
+   Vary: Accept-Encoding
+- url: /robots.txt
+  static_files: resources/robots.txt
+  upload: resources/robots\.txt
+  expiration: 365d
+  mime_type: text/plain
   http_headers:
    Vary: Accept-Encoding
 - url: /crossdomain.xml

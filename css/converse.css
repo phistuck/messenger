@@ -40,6 +40,10 @@ BODY.offline-mode .connection-state
  border-radius: 5px;
  padding: 2px;
 }
+BODY.start-up
+{
+ display: none;
+}
 BODY, TEXTAREA, INPUT
 {
  font-family: Arial, sans-serif;
