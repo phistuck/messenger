@@ -1,57 +1,8 @@
-/*jslint maxlen: 180*/
-// ==ClosureCompiler==
-// @output_file_name default.js
-// @js_externs var goog = {}; goog.appengine = {};
-// @js_externs /** @constructor @param {string} str */ goog.appengine.Channel = function (str) {};
-// @js_externs /** @constructor @param {string} str */ goog.appengine.Socket = function () {};
-// @js_externs goog.appengine.Socket.prototype.close = function () {};
-// @js_externs goog.appengine.Socket.prototype.onclose = function () {};
-// @js_externs goog.appengine.Socket.prototype.onopen = function () {};
-// @js_externs goog.appengine.Socket.prototype.onerror = function () {};
-// @js_externs goog.appengine.Socket.prototype.onmessage = function () {};
-// @js_externs /** @param {Object} obj @return {goog.appengine.Socket} */ goog.appengine.Channel.prototype.open = function (obj) {};
-// @js_externs /** @typedef {HTMLAudioElement} */ var Audio;
-// @compilation_level ADVANCED_OPTIMIZATIONS
-// @warning_level VERBOSE
-// ==/ClosureCompiler==
 /*jslint sloppy: true, browser: true, white: true,
          maxerr: 999, maxlen: 80, indent: 1, devel: true*/
-/*global main, webkitNotifications, escape, unescape, goog */
-//(function () {
-/*pr1operties
-    $, ActiveXObject, XMLHttpRequest, abort, abortCheckerRequest, action, add,
-    addEventListener, altKey, appendChild, atWork, blur, body,
-    canPlayType, cancel, 'canned-message', cannedIndicesCookieName,
-    cannedMessageField, charCodeAt, checkPermission, checked, checker,
-    checkerTimer, checkerTimeoutTimer, className, concealedMessageField,
-    concealedTyping, concealment, confirmContinueChecking, confirmNew,
-    confirmRead, confirmReadButton, confirmSent, console, cookie,
-    copyConcealedMessage, createElement, createNotification, createRequest,
-    ctrlKey, documentElement, enabled, event, firstTag, flash, focus, form,
-    getAttribute, getCookie, getElementById, getElementsByTagName, glow,
-    glowTimer, handleGlobalShortcuts, handleMessageFieldKeys, height, href,
-    html5, id, initialize, initializeSound, innerHTML, insertBefore, keyCode,
-    lastMessageID, letterPattern, load, loadCannedMessageOrder, location, log,
-    main, match, message, messageField, messages, name, newMessages,
-    newRequest, newRequestRetries, newURL, notification, notifications, notify,
-    notifyRecipient, onchange, onclick, onerror, onkeydown, onkeyup,
-    onreadystatechange, onsubmit, open, options, originalMessage,
-    originalTitle, parentNode, play, prepare, presenceIndication, presenceText,
-    preventDefault, process, readyState, receptor, recipient, refreshArea,
-    refreshLink, refreshURL, removeChild, replace, reply, requestPermission,
-    requestPermissionLink, responseText, resumeCheckingLink,
-    saveCannedMessageOrder, selectedIndex, send, sendManually, sendRequest,
-    sendURL, setAttribute, setCookie, setRequestHeader, settings, shiftKey,
-    shouldRefreshField, show, showingPresence, sound, soundURL, split, src,
-    srcElement, stalePresenceTextTimer, startCheckerTimer, status, statusText,
-    submit, tag, target, testDatabase, title, toGMTString, toggleField, type,
-    typing, updateBodyIndicator, updatePresenceText, useCannedMessage,
-    userName, value, webkitNotifications, width, location, doc, html,
-    coords, latitude, longitude, geolocation, getCurrentPosition,
-    presenceLocation, statusMessage, updatePresenceLocation, isRTL,
-    originalChecked, style, direction, handleMessageKeyUp
-*/
-var /** @const */ MAIN_DEBUG = true;
+/*global main, webkitNotifications, escape, unescape, goog, Notification */
+/** @define {boolean} */
+var MAIN_DEBUG = true;
 
 /*jslint sub: true*/
 if (MAIN_DEBUG)
@@ -68,7 +19,7 @@ if (MAIN_DEBUG)
  }
 }
 /*jslint sub: false*/
-/** @namespace The main and only global. */
+/** @namespace The global main. */
 var main = {};
 //if (!window.main)
 //{
@@ -81,20 +32,23 @@ if (!main.$)
  main.$ = {};
 }
 
+/** @type {undefined} */
+main.$.notDefined = void 0;
 /** @type {RegExp} */
-main.$.letterPattern = new RegExp("^[^a-zא-ת]+", "gi");
+main.$.letterPattern = null;
 /** @type {RegExp} */
-main.$.whitespacePatten = new RegExp("\\n\\s\\t\\r", "g");
+main.$.whitespacePatten = null;
 /** @type {RegExp} */
 main.$.urlPattern =
  new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "gi");
+/** @type {RegExp} */
 main.$.manualURLPattern = null;
 /** @type {Array.<RegExp>} */
 main.$.englishLetterPatterns = null;
 /** @type {Array.<RegExp>} */
 main.$.englishSymbolPatterns = null;
 /** @type {RegExp} */
-main.$.parenthesesPattern = new RegExp("[()]", "g");
+main.$.parenthesesPattern = null;
 /** @type {string} */
 main.$.addEventString = "addEventListener";
 /** @type {string} */
@@ -132,7 +86,7 @@ main.$.id =
 main.$.tag =
  function (tagName, elementOrDocument)
  {
-  return (typeof elementOrDocument === null || !tagName)?
+  return (elementOrDocument === null || !tagName)?
           null:
           (elementOrDocument || main.doc).getElementsByTagName(
            (tagName || "").toUpperCase());
@@ -175,7 +129,12 @@ main.$.createElement =
 main.$.isRTL =
  function (content)
  {
-  var letters = content.replace(main.$.letterPattern, "");
+  var letters;
+  if (!main.$.letterPattern)
+  {
+   main.$.letterPattern = new RegExp("^[^a-zא-ת]+", "gi");
+  }
+  letters  = content.replace(main.$.letterPattern, "");
   return letters.length > 0 && letters.charCodeAt(0) > 1487 &&
          letters.charCodeAt(0) < 1515;
  };
@@ -247,6 +206,10 @@ main.$.translateHebrewToEnglish =
    /*jslint plusplus: false*/
     text =
      text.replace(main.$.englishSymbolPatterns[i], hebrewSymbolKeys.charAt(i));
+   }
+   if (!main.$.parenthesesPattern)
+   {
+    main.$.parenthesesPattern = new RegExp("[()]", "g");
    }
    text =
     text.replace(main.$.parenthesesPattern, reverseParentheses);
@@ -405,12 +368,12 @@ main.$.load =
   if (main.support.storage)
   {
    if (window.sessionStorage &&
-       typeof window.sessionStorage[name] !== "undefined")
+       typeof window.sessionStorage[name] === "string")
    {
     return window.sessionStorage[name];
    }
    if (window.localStorage &&
-       typeof window.localStorage[name] !== "undefined")
+       typeof window.localStorage[name] === "string")
    {
     return window.localStorage[name];
    }
@@ -434,10 +397,13 @@ main.$.save =
 main.$.preventDefault =
  function (e)
  {
-  e.returnValue = false;
   if (e.preventDefault)
   {
    e.preventDefault();
+  }
+  else
+  {
+   e.returnValue = false;
   }
  };
 main.$.scheduleTask =
@@ -474,10 +440,16 @@ main.$.parseJSON =
  {
   try
   {
-   return ((window.JSON && JSON.parse) || eval)(string);
+   if (window.JSON)
+   {
+    return JSON.parse(string);
+   }
+   /*jslint evil: true*/
+   return eval(string);
   }
   catch (e)
   {
+   /*jslint evil: false*/
    return "";
   }
  };
@@ -499,50 +471,62 @@ main.version = "";
 main.socket = null;
 /** @type {string} */
 main.channelToken = "";
-/** @type {?boolean} */
-main.atWork = null;
-/** @type {Element} */
-main.cannedMessageField = main.form["canned-message"];
-/** @type {Element} */
-main.concealedMessageField = main.$.id("concealed-message");
+/** @type {boolean} */
+main.atWork = false;
+/** @type {HTMLSelectElement} */
+main.cannedMessageField =
+/** @type {HTMLSelectElement} */ (main.form["canned-message"]);
+/** @type {HTMLTextAreaElement} */
+main.concealedMessageField =
+ /** @type {HTMLTextAreaElement} */ (main.$.id("concealed-message"));
 /** @type {boolean} */
 main.concealedTyping = false;
 /** @type {boolean} */
 main.concealment = false;
 /** @type {boolean} */
 main.wasAtScrollBottom = false;
-/** @type {?string} */
-main.firstMessageTimestamp = null;
-/** @type {?string} */
-main.lastMessageID = null;
-/** @type {?string} */
-main.lastMessageTimestamp = null;
+/** @type {boolean} */
+main.normalMessenger = true;
+/** @type {boolean} */
+main.initialState = false;
+/** @type {string} */
+main.firstMessageTimestamp = "";
+/** @type {string} */
+main.lastMessageID = "";
+/** @type {string} */
+main.originalTitle = main.doc.title || "";
+/** @type {string} */
+main.lastMessageTimestamp = "";
 /** @type {number} */
 main.lastTypingIndicationTimestamp = (new Date()).getTime() - 5000;
 /** @type {number} */
 main.lastConnectivitySignalTimestamp = (new Date()).getTime() - 30000;
-/** @type {?string} */
-main.location = null;
+/** @type {string} */
+main.location = "";
 /*jslint sub: true*/
-/** @type {Element} */
+/** @type {!HTMLTextAreaElement} */
 main.messageField = main.form["content"];
-/** @type {Element} */
-main.thinkingButton = main.$.id("thinking");
+/** @type {!HTMLButtonElement} */
+main.thinkingButton =
+ /** @type {!HTMLButtonElement} */ (main.$.id("thinking"));
 /*jslint sub: false*/
 /** @type {boolean} */
 main.newMessages = false;
 /** @type {boolean} */
 main.noOldMessages = false;
 /*jslint sub: true*/
-/** @type {Element} */
+/** @type {!HTMLInputElement} */
 main.notifyRecipient = main.form["notify"];
 /*jslint sub: false*/
-/** @type {Element} */
-main.presenceIndication = main.$.id("presence-data");
-/** @type {Element} */
-main.presenceLocation = main.$.tag("span", main.presenceIndication)[1];
-/** @type {Element} */
-main.presenceStatus = main.$.firstTag("span", main.presenceIndication);
+/** @type {!Element} */
+main.presenceIndication =
+ /** @type {!Element} */ (main.$.id("presence-data"));
+/** @type {!Element} */
+main.presenceLocation =
+ /** @type {!Element} */ (main.$.tag("span", main.presenceIndication)[1]);
+/** @type {!Element} */
+main.presenceStatus =
+ /** @type {!Element} */ (main.$.firstTag("span", main.presenceIndication));
 /** @type {number} */
 main.pingInterval = 30000;
 /** @type {boolean} */
@@ -553,16 +537,18 @@ main.channelCount = 1;
 main.channelCountStartTime = (new Date()).getTime();
 /** @type {string} */
 main.recipient = "";
-/** @type {Element} */
-main.resumeCheckingLink = main.$.id("resume-checking");
-/** @type {Element} */
-main.shouldRefreshField = main.$.id("should-refresh");
-/** @type {?number} */
-main.connectivityTimeoutTimer = null;
+/** @type {!Element} */
+main.resumeCheckingLink =
+ /** @type {!Element} */ (main.$.id("resume-checking"));
+/** @type {!Element} */
+main.shouldRefreshField =
+ /** @type {!Element} */ (main.$.id("should-refresh"));
+/** @type {number} */
+main.connectivityTimeoutTimer = 0;
 /** @type {XMLHttpRequest|ActiveXObject} */
 main.reclaimTokenRequest = null;
-/** @type {?number} */
-main.stalePresenceTextTimer = null;
+/** @type {number} */
+main.stalePresenceTextTimer = 0;
 /** @type {Element} */
 main.statusMessage = main.$.firstTag("div", main.form);
 /** @type {boolean} */
@@ -573,30 +559,37 @@ main.desktop = false;
 main.typing = false;
 /** @type {boolean} */
 main.recipientThinking = false;
-/** @type {?string} */
-main.userName = null;
-/** @const   
-    @type {string} */
+/** @type {string} */
+main.userName = "";
+/** @type {string} */
 main.normalIcon = "/favicon.ico";
-/** @const   
-    @type {string} */
+/** @type {string} */
 main.newMessageIcon = "/images/new-message-icon.ico";
 /** @type {string} */
 main.currentIcon = main.normalIcon;
-/** @type {HTMLLinkElement|Node} */
+/** @type {HTMLLinkElement} */
 main.eIcon = null;
 
 main.updateIcon =
  function (newMessage)
  {
+  if (!newMessage && (main.currentIcon === main.normalIcon))
+  {
+   return;
+  }
   if (!main.eIcon)
   {
-   main.eIcon = main.$.createElement("link");
-   main.eIcon.setAttribute("rel", "icon");
-   main.eIcon.setAttribute("href", main.currentIcon);
-   main.eIcon.setAttribute("type", "image/x-icon");
-   main.eIcon =
-    main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild);
+   main.eIcon = /** @type {HTMLLinkElement} */ (main.$.id("favicon"));
+   if (!main.eIcon)
+   {
+    main.eIcon = /** @type {HTMLLinkElement} */ (main.$.createElement("link"));
+    main.eIcon.setAttribute("rel", "icon");
+    main.eIcon.setAttribute("href", main.currentIcon);
+    main.eIcon.setAttribute("type", "image/x-icon");
+    main.eIcon =
+     /** @type {HTMLLinkElement} */
+     (main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild));
+   }
   }
   main.currentIcon =
    main.eIcon.href = newMessage? main.newMessageIcon: main.normalIcon;
@@ -833,6 +826,10 @@ main.updatePresenceData =
   {
    return;
   }
+  if (!main.$.whitespacePatten)
+  {
+   main.$.whitespacePatten = new RegExp("\\n\\s\\t\\r", "g");
+  }
   if ((indicateTypingState || typedLately) &&
       main.messageField.value.replace(main.$.whitespacePatten, ""))
   {
@@ -990,7 +987,6 @@ main.replaceReceptor =
   newReceptor.id = receptor.id;
   newReceptor.className = receptor.className;
   receptor.id = "";
-  // TODO - Perhaps make this more general.
   receptor.className = "";
   return receptor.parentNode.insertBefore(
           newReceptor,
@@ -1032,6 +1028,7 @@ main.clearDialog =
   main.doc[main.$.removeEventString](
    main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
+/** @param {Event|KeyboardEvent|MouseEvent=} e */
 main.handleClicks =
  function (e)
  {
@@ -1145,7 +1142,7 @@ main.createChannel =
     main.sendReport(
      "channel-error",
      [e, e.code, typeof e.code, e.description, a, b, c].join(","));
-    if (e && e.description.indexOf("Token time") > -1)
+    if (e && e.description.replace(/\+/g, " ").indexOf("Token time") > -1)
     {
      main.reclaimToken();
     }
@@ -1169,6 +1166,11 @@ main.reopenChannel =
    catch (e)
    {
    }
+
+   main.settings.waitingForFetch = false;
+   main.settings.offline = true;
+   main.updateBodyIndicator();
+
    main.createChannel();
   }
   main.$.scheduleTask(recreateChannel);
@@ -1398,6 +1400,7 @@ main.hideRedundantOutro =
 main.initialize =
  function ()
  {
+  /** @type {!string} */
   function get(name)
   {
    return main.html.getAttribute("data-" + name);
@@ -1415,20 +1418,35 @@ main.initialize =
    }
    navigator.geolocation.getCurrentPosition(storeLocation);
   }
-  if (navigator.userAgent.indexOf("Windows") !== -1 &&
-      main.$.getCookie("authenticated") !== "1")
+
+  if (get("normal") === "1")
   {
-   main.doc.location.reload();
-   return;
+   main.normalMessenger = true;
+   main.normalIcon = "/images/favicon.png";
+   main.newMessageIcon = "/images/new-message-favicon.png";
   }
-  else
+
+  if (get("new-messages-mode") === "1")
   {
+   main.newMessages = true;
+   main.initialState = true;
+  }
+
+  if (navigator.userAgent.indexOf("Windows") !== -1)
+  {
+   if (!main.normalMessenger && main.$.getCookie("authenticated") !== "1")
+   {
+    main.doc.location.reload();
+    return;
+   }
    main.updateBodyIndicator();
   }
+  
+  /*jslint sub: true*/
   // If there is no goog object, there is not point in staying here.
   if (!window["goog"])
   {
-   main.updateBodyIndicator();
+  /*jslint sub: false*/
    main.showDialog(
     "There is a problem with the service. Please, reload the page.");
    return;
@@ -1444,7 +1462,7 @@ main.initialize =
   window.onscroll = main.handleScroll;
   main.lastMessageTimestamp = get("last-message-timestamp");
   main.firstMessageTimestamp = get("first-message-timestamp");
-  main.newMessages = get("new-messages-mode") === "1";
+
   main.userName = get("user-name");
   main.recipient = get("recipient");
   main.refreshURL = get("current-url");
@@ -1472,7 +1490,6 @@ main.initialize =
   main.html.onkeydown = main.handleGlobalShortcuts;
   main.doc.onclick = main.handleClicks;
   main.doc.onbeforeunload = main.handleExit;
-  main.doc.originalTitle = main.doc.title;
   main.dialog.onclick = main.clearDialog;
   main.dialog.ontouchend = main.clearDialog;
   window.onerror =
@@ -1512,18 +1529,21 @@ main.initialize =
   {
    main.version = String(new Date());
   }
-  main.notifications.notificationURL +=
-   "from=" + main.$.encode(main.userName) +
-   "&v=" + main.$.encode(main.version);
+  window.onbeforeunload = main.handleExitPreparations;
   window.onload =
    function ()
    {
-    main.scrollToBottom();
-    main.handleScroll();
-    if (main.wasAtScrollBottom)
-    {
-     hideRedundantOutro();
-    }
+    setTimeout(
+     function ()
+     {
+      main.scrollToBottom();
+      main.handleScroll();
+      if (main.wasAtScrollBottom)
+      {
+       main.hideRedundantOutro();
+      }
+     },
+     100);
    };
   main.channelToken = get("channel-name");
   main.createChannel();
@@ -1539,7 +1559,7 @@ main.initialize =
    main.messages.startCheckerTimer();
   }
   /*jslint sub: true*/
-  if (typeof main.$.createElement("input")["autofocus"] === "undefined" &&
+  if (typeof main.$.createElement("input")["autofocus"] !== "boolean" &&
       !main.desktop)
   {
   /*jslint sub: false*/
@@ -1603,7 +1623,7 @@ main.settings.getSetSetting =
  function (fieldName, savedSettingName, enable)
  {
   var field = main.settings.form[fieldName];
-  if (typeof enable !== "undefined")
+  if (typeof enable === "boolean")
   {
    field.checked = enable;
    main.$.save(savedSettingName, enable, new Date());
@@ -1652,10 +1672,7 @@ main.notifications.enabled = true;
 main.notifications.notification = null;
 /** @type {Audio|HTMLAudioElement|Element|Node} */
 main.notifications.sound = null;
-/** @type {string} */
-main.notifications.notificationURL = "notification?";
-/** @type {string}
-    @const */
+/** @const {string} */
 main.notifications.soundURL = "/resources/notification.mp3";
 /** @type {Element} */
 main.notifications.settings = main.$.id("notification-settings");
@@ -1740,7 +1757,7 @@ main.notifications.play =
 main.notifications.show =
  function ()
  {
-  var notification, blockedPopups = false;
+  var notification, notificationPopup, blockedPopups = false;
   if (!main.settings.showNotifications())
   {
    return;
@@ -1751,18 +1768,18 @@ main.notifications.show =
   }
   else if (!main.settings.nativeDesktopNotifications())
   {
-   notification = main.notifications.notificationPopup;
-   if (!notification)
+   notificationPopup = main.notifications.notificationPopup;
+   if (!notificationPopup)
    {
     main.notifications.notificationPopup =
      window.open(
       "/notification", "Notification",
      "width=400, height=80, left=" + (screen.availWidth - 400) + "," +
      "top=" + (screen.availHeight - 100));
-    notification = main.notifications.notificationPopup;
+    notificationPopup = main.notifications.notificationPopup;
     try
     {
-     if (!notification || notification.closed)
+     if (!notificationPopup || notificationPopup.closed)
      {
       blockedPopups = true;
      }
@@ -1776,18 +1793,32 @@ main.notifications.show =
      main.showBlockedPopupMessage();
     }
    }
-   notification = main.notifications.notificationPopup;
+   if (notificationPopup)
+   {
+    notificationPopup.onclose =
+     function ()
+     {
+      main.notifications.notificationPopup = null;
+     };
+   }
   }
   else
   {
    notification = main.notifications.notification;
    if (!notification)
    {
-    notification =
-     webkitNotifications.createHTMLNotification(
-      main.notifications.notificationURL);
-    notification.show();
-    main.notifications.notification = notification;
+    main.notifications.notification =
+     main.notifications.create(
+      "Messenger", main.recipient + " sent a message.");
+    notification = main.notifications.notification;
+    if (!main.normalMessenger)
+    {
+     notification.onclick =
+      function ()
+      {
+       window.focus();
+      };
+    }
    }
   }
   if (notification)
@@ -1796,23 +1827,30 @@ main.notifications.show =
     function ()
     {
      main.notifications.notification = null;
-     main.notifications.notificationPopup = null;
     };
   }
  };
 main.notifications.hide =
  function ()
  {
-  var notification = main.notifications.notification;
+  var /** @type {Notification} */
+      notification = main.notifications.notification,
+      /** @type {Window} */ notificationPopup;
   if (notification)
   {
+   if (window.Notification)
+   {
+    notification.close();
+   }
+   else
+   {
     notification.cancel();
-    main.notifications.notification = null;
+   }
   }
-  notification = main.notifications.notificationPopup;
-  if (notification)
+  notificationPopup = main.notifications.notificationPopup;
+  if (notificationPopup)
   {
-   notification.close();
+   notificationPopup.close();
    main.notifications.notificationPopup = null;
   }
   if (main.notifications.showArrow)
@@ -1821,16 +1859,48 @@ main.notifications.hide =
    main.updateBodyIndicator();
   }
  };
+main.notifications.addListeners =
+ function ()
+ {
+  function alwaysHide()
+  {
+   if (main.normalMessenger)
+   {
+    main.messages.confirmRead();
+   }
+   else
+   {
+    main.notifications.hide();
+   }
+  }
+  function hide()
+  {
+   if (main.initialState)
+   {
+    return;
+   }
+   alwaysHide();
+  }
+  /** @param {string} type
+      @param {boolean=} always */
+  function add(type, always)
+  {
+   main.doc[main.$.addEventString](
+    main.$.eventTypePrefix + type, (always? alwaysHide: hide), false);
+   window[main.$.addEventString](
+    main.$.eventTypePrefix + type, (always? alwaysHide: hide), false);
+  }
+  add("resize");
+  add("focus");
+  if (!main.normalMessenger)
+  {
+   add("mousemove");
+  }
+  add("keydown", true);
+ };
 main.notifications.initialize =
  function ()
  {
-  function add(type)
-  {
-   main.doc[main.$.addEventString](
-    main.$.eventTypePrefix + type, main.notifications.hide, false);
-   window[main.$.addEventString](
-    main.$.eventTypePrefix + type, main.notifications.hide, false);
-  }
   /** @this {HTMLInputElement} */
   main.settings.form["visual-notification"].onclick =
    function ()
@@ -1858,18 +1928,34 @@ main.notifications.initialize =
   {
    main.settings.showNotifications(true);
   }
-  add("resize");
-  add("focus");
-  add("mousemove");
-  add("keydown");
+  main.notifications.addListeners();
+ };
+/** @param {string} title
+    @param {string} content
+    @return {Notification} */
+main.notifications.create =
+ function (title, content)
+ {
+  var /** @type {Notification} */ notification;
+  if (window.Notification)
+  {
+   return new Notification(title, {body: content});
+  }
+  notification =
+   webkitNotifications.createNotification(main.normalIcon, title, content);
+  notification.show();
+  return notification;
  };
 main.notifications.prepare =
  function ()
  {
-  /** @param {boolean=} doNotSet */
-  function checkPermission(doNotSet)
+  /** @param {?string=} permission
+      @param {boolean=} doNotSet */
+  function checkPermission(permission, doNotSet)
   {
-   if (webkitNotifications.checkPermission() === 0)
+   if (permission === "granted" ||
+       (window.webkitNotifications &&
+        webkitNotifications.checkPermission() === 0))
    {
     main.support.nativeDesktopNotifications = true;
     if (!doNotSet)
@@ -1880,7 +1966,7 @@ main.notifications.prepare =
    }
   }
   
-  if (!window.webkitNotifications)
+  if (!window.Notification && !window.webkitNotifications)
   {
    return;
   }
@@ -1890,9 +1976,17 @@ main.notifications.prepare =
   main.settings.form["desktop-notification"].onclick =
    function ()
    {
-    if (!main.support.nativeDesktopNotifications && !checkPermission(true))//xxx
+    if (!main.support.nativeDesktopNotifications &&
+        !checkPermission(null, true))
     {
-     webkitNotifications.requestPermission(checkPermission);
+     if (window.Notification)
+     {
+      Notification.requestPermission(checkPermission);
+     }
+     else if (window.webkitNotifications)
+     {
+      webkitNotifications.requestPermission(checkPermission);
+     }
     }
     else
     {
@@ -1900,7 +1994,7 @@ main.notifications.prepare =
       "desktop-notification", "show-desktop-notification", this.checked);
     }
    };
-   if (checkPermission(true) && main.settings.savedSettings.desktop)
+   if (checkPermission(null, true) && main.settings.savedSettings.desktop)
    {
     main.settings.nativeDesktopNotifications(true);
    }
@@ -1925,8 +2019,7 @@ if (!main.messages)
 }
 /** @type {Element} */
 main.messages.confirmReadButton = main.$.id("confirm-read-messages");
-/** @type {string}
-    @const */
+/** @const {string} */
 main.messages.cannedIndicesCookieName = "canned-indices";
 /** @type {?number} */
 main.messages.checkerTimer = null;
@@ -2040,12 +2133,12 @@ main.messages.confirmRead =
   {
    main.messages.glowTimer = clearInterval(main.messages.glowTimer);
   }
+  main.initialState = false;
   main.newMessages = false;
   main.updateBodyIndicator();
   main.notifications.hide();
-  button.className = "hidden";
   main.messages.receptor = main.replaceReceptor(main.messages.receptor);
-  main.doc.title = main.doc.originalTitle;
+  main.doc.title = main.originalTitle;
   main.resetIcon();
   if (this === button)
   {
@@ -2062,7 +2155,10 @@ main.messages.glow =
   // {
    // main.updateIcon(main.currentIcon === main.normalIcon);
   // }
-  main.doc.title = String(parseInt(main.doc.title, 10) + 1);
+  if (!main.normalMessenger)
+  {
+   main.doc.title = String(parseInt(main.doc.title, 10) + 1);
+  }
   main.updateIcon(main.currentIcon === main.normalIcon);
  };
 main.messages.copyConcealedMessage =
@@ -2073,9 +2169,15 @@ main.messages.copyConcealedMessage =
 main.messages.handleMessageFieldKeyUp =
  function ()
  {
-  var message = main.messageField;
-  message.style.direction = main.$.isRTL(message.value)? "rtl": "ltr";
-  if (main.messageField.value.length)
+  var /** @type {HTMLTextAreaElement} */
+      eMessage = /** @type {HTMLTextAreaElement} */(main.messageField),
+      /** @type {string} */ message = eMessage.value,
+      /** @type {string} */ lastMessage = main.messages.lastTypedMessage;
+  if (!lastMessage || lastMessage !== message.substring(0, lastMessage.length))
+  {
+   eMessage.style.direction = main.$.isRTL(message)? "rtl": "ltr";
+  }
+  if (message.length)
   {
    main.updatePresenceData(true);
   }
@@ -2086,8 +2188,12 @@ main.messages.handleMessageFieldKeyUp =
 main.messages.handleMessageFieldKeys =
  function (e)
  {
-  var concealed = main.concealedMessageField, key, mobileEnter,
-      message = main.messageField, source;
+  var /** @type {HTMLTextAreaElement} */
+      concealed = main.concealedMessageField,
+      /** @type {number} */ key,
+      /** @type {boolean} */ mobileEnter,
+      /** @type {HTMLTextAreaElement} */ message = main.messageField,
+      /** @type {Element} */ source;
   /*function cancelMeOnce(e)
   {
    if (!e)
@@ -2122,8 +2228,7 @@ main.messages.handleMessageFieldKeys =
   {
    return false;
   }
-  if ((key === 13 || mobileEnter) &&
-      !e.shiftKey)
+  if ((key === 13 || mobileEnter) && !e.shiftKey)
   {
    if (e.ctrlKey)
    {
@@ -2151,13 +2256,18 @@ main.messages.handleMessageFieldKeys =
 main.messages.loadCannedMessageOrder =
  function ()
  {
-  var cannedIndices = main.$.load(main.messages.cannedIndicesCookieName),
-      cannedMessages = [], field = main.cannedMessageField, i = 0, length;
-  if (!cannedIndices)
+  var /** @type {string} */ rawCannedIndices =
+       main.$.load(main.messages.cannedIndicesCookieName),
+      /** @type {Array.<string>} */ cannedIndices,
+      /** @type {Array.<Element>} */ cannedMessages = [],
+      /** @type {HTMLSelectElement} */ field = main.cannedMessageField,
+      /** @type {number} */ i = 0,
+      /** @type {number} */ length;
+  if (!rawCannedIndices)
   {
    return;
   }
-  cannedIndices = cannedIndices.split(",");
+  cannedIndices = rawCannedIndices.split(",");
   cannedMessages = [];
   /*jslint plusplus: true*/
   for (length = cannedIndices.length; i < length; i++)
@@ -2185,7 +2295,14 @@ main.messages.notify =
   }
   else
   {
-   main.doc.title = "1";
+   if (main.normalMessenger)
+   {
+    main.doc.title = main.recipient + " says...";
+   }
+   else
+   {
+    main.doc.title = "1";
+   }
    if (!main.messages.glowTimer)
    {
     main.messages.glowTimer = setInterval(main.messages.glow, 1000);
@@ -2283,6 +2400,7 @@ main.messages.send =
    {
     var header, receptor = main.messages.receptor, element,
         container = main.$.createElement("div", "system-message message");
+        container.id = uniqueID;
         container.originalMessage = message;
         container.notify = !!notify;
         header = container.appendChild(
@@ -2403,13 +2521,23 @@ main.messages.send =
      main.messages.sendMessageCallbacks[uniqueID] =
       function ()
       {
+       var undeliveredMessageElement;
        resetTimer();
        undeliveredTimeout = clearTimeout(undeliveredTimeout);
 
        delete main.messages.sendMessageCallbacks[uniqueID];
        delete main.messages.sendMessageCallbacks[messageKey];
 
+       // Removing any left overs.
+       undeliveredMessageElement = main.$.id(uniqueID);
+       
        cleanup();
+       
+       if (undeliveredMessageElement && undeliveredMessageElement.parentNode)
+       {
+        undeliveredMessageElement.parentNode.removeChild(
+         undeliveredMessageElement);
+       }
       };
     }
     main.form.reset();
@@ -2524,9 +2652,6 @@ main.messages.useCannedMessage =
   main.messages.saveCannedMessageOrder(
    cannedMessage.getAttribute("data-index"));
   cannedMessageField.selectedIndex = 0;
-  /*jslint sub: true*/
-  main.form["notify"].checked = true;
-  /*jslint sub: true*/
   main.messages.send();
  };
 main.messages.startCheckerTimer =
@@ -2863,8 +2988,11 @@ main.processDesktopCall =
    main.focusMessageField();
   }
  };
+ 
 main.initialize();
+
 /*jslint sub: true*/
+/** @namespace The public API. */
 window["mainAPI"] = {};
 window["mainAPI"]["dispatchNotificationAction"] = main.dispatchAction;
 window["mainAPI"]["indicateBlockedPopups"] = main.showBlockedPopupMessage;
@@ -2876,7 +3004,7 @@ if (main.desktop)
 /*jslint sub: false*/
 if (MAIN_DEBUG)
 {
- main.$.log("Questions  & answers?");
+ main.$.log("Questions & answers?");
  main.$.log("Implement the iPhone audio playback workaround?");
 }
 // }());

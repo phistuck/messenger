@@ -1,7 +1,7 @@
 import httplib, urllib, sys, os
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 sys.path = sys.path + [r"lib",
-                       r"lib\webob_1_1_1", r"lib\django_0_96"]
+                       r"lib\webob-1.1.1", r"lib\django-0.96"]
 from google.appengine.ext.webapp import template
 
 should_minify = False
@@ -27,8 +27,8 @@ if should_minify:
  code = template.render(converse_script_path, {})
  code = \
   code.replace(
-   "var /** @const */ MAIN_DEBUG = true;",
-   "var /** @const */ MAIN_DEBUG = false;")
+   "var MAIN_DEBUG = true;",
+   "var MAIN_DEBUG = false;")
  code = code.replace("main.$.log", "if (MAIN_DEBUG) main.$.log");
  code = code.replace("console.log", "if (MAIN_DEBUG) console.log");
  externs = template.render(DIR_PATH + r"\..\scripts\externs.js", {})

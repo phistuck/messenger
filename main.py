@@ -38,7 +38,7 @@ def secure(self, no_cache = False):
   self.response.headers["Strict-Transport-Security"] = \
    "max-age=500; includeSubdomains"
  if no_cache:
-  self.response.headers["Cache-Control"] = "no-cache"
+  self.response.headers["Cache-Control"] = "no-cache, no-store"
   self.response.headers["Pragma"] = "no-cache"
   self.response.headers["Expires"] = "-1"
  else:
@@ -275,11 +275,11 @@ def send_message(
     (datetime.now() - timedelta(seconds = 1))
    set_data(data)
   return (True, message_key)
- except (db.NotSavedError, db.Timeout, apiproxy_errors.DeadlineExceededError):
+ except (db.NotSavedError, db.Timeout, apiproxy_errors.DeadlineExceededError) as exception:
   if not dynamic:
    return (False, "")
   else:
-   raise "Error"
+   raise exception
 
 def convert_coordinates_to_address(location, data = None):
  if location:
@@ -321,7 +321,9 @@ def update_presence_state(
   if last_read_message_timestamp:
    (data, users_data) = get_data("users-data", {}, data = data)
    user_data = initialize_user_data(users_data, user)
-   user_data["last-read-message-timestamp"] = last_read_message_timestamp
+   if not user_data["last-read-message-timestamp"] or \
+      last_read_message_timestamp > user_data["last-read-message-timestamp"]:
+    user_data["last-read-message-timestamp"] = last_read_message_timestamp
   if user in active_users:
    previous_user_state = active_users[user]
    if location and location != previous_user_state["location-coordinates"]:
@@ -367,6 +369,7 @@ def update_presence_state(
 
 def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object = {}
+ show_messages = False
  (data, users_data) = get_data("users-data", {}, data = data)
  user_data = initialize_user_data(users_data, user)
  timestamp = user_data["last-read-message-timestamp"]
@@ -389,15 +392,16 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
      test_mode, user, count, timestamp, False)
  else:
   fetched_unread_messages = []
-  return_object["show-messages"] = True
+  show_messages = True
  while len(fetched_unread_messages):
   if fetched_unread_messages[0].sender == user:
    fetched_messages.append(fetched_unread_messages.pop(0))
-   return_object["show-messages"] = True
+   show_messages = True
   else:
    break
  return_object["last-messages"] = fetched_messages
  return_object["new-messages"] = fetched_unread_messages
+ return_object["show-messages"] = show_messages
  return return_object
 
 """
@@ -407,7 +411,8 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
 class ConversePage(webapp2.RequestHandler):
  def get(self):
   secure(self, no_cache = True)
-  if not authentication.is_authenticated(self, DEV_MODE):
+  normal_mode = self.request.get("normal") == "1"
+  if not normal_mode and not authentication.is_authenticated(self, DEV_MODE):
    return
   development = self.request.get("dev") == "1"
   desktop = self.request.get("desktop") or "0"
@@ -454,7 +459,8 @@ class ConversePage(webapp2.RequestHandler):
   variables["desktop_mode"] = mode_desktop
   variables["new_messages_mode"] = len(unread_messages) > 0
   variables["unread_messages"] = unread_messages
-  variables["development"] = development  
+  variables["development"] = development
+  variables["normal"] = normal_mode
   try:
    variables["channel_name"] = \
     channel.create_channel(

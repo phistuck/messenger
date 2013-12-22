@@ -1,0 +1,2 @@
+cd ..\scripts
+java -jar compiler.jar --js converse.js --js_output_file converse.min.js --output_wrapper "(function() {%%output%%})(); //@ sourceMappingURL=converse.map.js" --warning_level VERBOSE --externs externs.js --compilation_level ADVANCED_OPTIMIZATIONS --define MAIN_DEBUG=false --create_source_map converse.map.js

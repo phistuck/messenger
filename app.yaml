@@ -1,22 +1,21 @@
 application: messenger
 
-version: 0-0-1-13
+version: 0-0-1-14
 runtime: python27
 api_version: 1
 threadsafe: true
+default_expiration: 365d
 
 handlers:
 - url: /
   static_files: resources/homepage.html
   upload: resources/homepage\.html
   mime_type: text/html
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /robots.txt
   static_files: resources/robots.txt
   upload: resources/robots\.txt
-  expiration: 365d
   mime_type: text/plain
   http_headers:
    Vary: Accept-Encoding
@@ -24,7 +23,6 @@ handlers:
   static_files: resources/crossdomain.xml
   upload: resources/crossdomain\.xml
   mime_type: text/html
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /redirect-to-converse
@@ -38,140 +36,142 @@ handlers:
   static_files: html/notification.html
   upload: html/notification\.html
   mime_type: text/html
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /favicon\.ico
   static_files: images/favicon.ico
   upload: images/favicon\.ico
   mime_type: image/vnd.microsoft.icon
-  expiration: 365d
   http_headers:
-   Vary: Accept-Encoding
+   Vary: Accept-Encoding, Cookie
+   #Cache-Control: public, max-age=31536000
 - url: /images/new-message-icon\.ico
   static_files: images/new-message-icon.ico
   upload: images/new-message-icon\.ico
   mime_type: image/vnd.microsoft.icon
-  expiration: 365d
   http_headers:
-   Vary: Accept-Encoding
+   Vary: Accept-Encoding, Cookie
+   #Cache-Control: public, max-age=31536000
+- url: /images/new-message-favicon\.png
+  static_files: images/new-message-favicon.png
+  upload: images/new-message-favicon\.png
+  mime_type: image/png
+  http_headers:
+   Vary: Accept-Encoding, Cookie
+   #Cache-Control: public, max-age=31536000
+- url: /images/favicon\.png
+  static_files: images/favicon.png
+  upload: images/favicon\.png
+  mime_type: image/png
+  http_headers:
+   Vary: Accept-Encoding, Cookie
+   #Cache-Control: public, max-age=31536000
 - url: /resources/notification\.mp3
   static_files: resources/notification.mp3
   upload: resources/notification\.mp3
   mime_type: audio/mpeg
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /resources/player\.swf
   static_files: resources/player.swf
   upload: resources/player\.swf
   mime_type: application/x-shockwave-flash
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /scripts/converse\.js
   static_files: scripts/converse.js
   upload: scripts/converse\.js
   mime_type: text/javascript
-  expiration: 365d
+  http_headers:
+   Vary: Accept-Encoding
+- url: /scripts/converse.map.js
+  static_files: scripts/converse.map.js
+  upload: scripts/converse\.map\.js
+  mime_type: text/javascript
   http_headers:
    Vary: Accept-Encoding
 - url: /scripts/converse\.min\.js
   static_files: scripts/converse.min.js
   upload: scripts/converse\.min\.js
   mime_type: text/javascript
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /css/converse\.css
   static_files: css/converse.css
   upload: css/converse\.css
   mime_type: text/css
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/new-messages-arrow\.gif
   static_files: images/new-messages-arrow.gif
   upload: images/new-messages-arrow\.gif
   mime_type: image/gif
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/typing\.gif
   static_files: images/typing.gif
   upload: images/typing\.gif
   mime_type: image/gif
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/clear-conversation\.png
   static_files: images/clear-conversation.png
   upload: images/clear-conversation\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/thinking\.png
   static_files: images/thinking.png
   upload: images/thinking\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/up\.png
   static_files: images/up.png
   upload: images/up\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/down\.png
   static_files: images/down.png
   upload: images/down\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/settings\.png
   static_files: images/settings.png
   upload: images/settings\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/notifications-disabled\.png
   static_files: images/notifications-disabled.png
   upload: images/notifications-disabled\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/sign-out\.png
   static_files: images/sign-out.png
   upload: images/sign-out\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/online\.png
   static_files: images/online.png
   upload: images/online\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/away\.png
   static_files: images/away.png
   upload: images/away\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: /images/offline\.png
   static_files: images/offline.png
   upload: images/offline\.png
   mime_type: image/png
-  expiration: 365d
   http_headers:
    Vary: Accept-Encoding
 - url: .*
