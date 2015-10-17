@@ -11,7 +11,8 @@ HTML
  scrollbar-shadow-color: #fff0f5;
  scrollbar-track-color: #fff0f5;
 }
-.connection-state
+.connection-state,
+#other-conversations
 {
  display: none;
 }
@@ -30,7 +31,8 @@ BODY.show-arrow #new-messages-arrow
 {
  display: inline-block;
 }
-BODY.offline-mode .connection-state
+BODY.offline-mode .connection-state,
+BODY.other-conversations #other-conversations
 {
  display: inline-block;
  background: red;
@@ -213,6 +215,15 @@ BODY.no-old-messages .fetch-more-messages
 BODY.new-messages .receptor .message
 {
  background: pink;
+}
+.message.other .message-headers
+{
+ font-weight: bold;
+}
+.message.other .message-headers:after
+{
+ content: " Other sender!";
+ color: red;
 }
 BODY.new-messages .receptor DIV.m, .m,
 BODY.new-messages .receptor DIV.system-message, .system-message
@@ -422,6 +433,71 @@ HTML.desktop-notifications .desktop-notifications
 .notification-toggles INPUT
 {
  vertical-align: middle;
+}
+
+@media (max-width: 300px)
+{
+ #thinking
+ {
+  height: 15px;
+ }
+ .message
+ {
+  padding: 0 5px;
+ }
+ #presence-data,
+ .intro
+ {
+  height: 30px;
+ }
+ FORM.messaging-form,
+ .outro
+ {
+  height: 50px;
+ }
+
+ .message-field-wrapper INPUT
+ {
+  vertical-align: top;
+  padding: 0;
+  margin: 0;
+  border: 0;
+ }
+ .message-field-wrapper TEXTAREA,
+ .message-field-wrapper INPUT
+ {
+  height: 15px;
+ }
+}
+
+@media (max-width: 300px), (max-width: 800px)
+{
+ #presence-data .location
+ {
+  font-size: 0.75em;
+ }
+ .canned-message-post-wrapper SELECT
+ {
+  float: left;
+ }
+ .notification-toggles
+ {
+  float: right;
+  font-size: 0.8em;
+ }
+}
+
+.message-field-wrapper TEXTAREA
+{
+ width: -moz-calc(100% - 75px - 5px);
+ width: -webkit-calc(100% - 75px - 5px);
+ width: calc(100% - 75px - 5px);
+}
+.canned-message-post-wrapper SELECT
+{
+ width: -moz-calc(100% - 75px - 5px - 5px);
+ width: -webkit-calc(100% - 75px - 5px - 5px);
+ width: calc(100% - 75px - 5px - 5px);
 }
 
 ::-webkit-scrollbar-button,

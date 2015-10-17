@@ -85,9 +85,11 @@ class MillisecondTimestamp:
   return year_switch_pattern.sub("\\2 \\1", self.timestamp.ctime()) + "." + \
           str(self.timestamp.microsecond / 1000) + " GMT+0000"
 
-def write_message(manage, message, user):
+def write_message(manage, message, user, recipient):
  content = message.content
  className = " m" if message.sender == user else ""
+ if not message.sender == user and not message.sender == recipient:
+  className += " other"
  if manage:
   manageString = " (<a data-action=\"remove\" href=\"#\">delete</a>)"
  else:
@@ -443,7 +445,7 @@ class ConversePage(webapp2.RequestHandler):
       define_first = False
      else:
       message_timestamp_offsets["last"] = message.timestamp.isoformat()
-     rendered_messages.append(write_message(mode_manage, message, user))
+     rendered_messages.append(write_message(mode_manage, message, user, recipient))
    return rendered_messages
   messages = render_messages(fetched_messages, True)
   unread_messages = render_messages(fetched_unread_messages, False)
@@ -1191,6 +1193,11 @@ class AddMessagePage(webapp2.RequestHandler):
   db_util.save_message(test_mode, sender, recipient, content, notified, timestamp = timestamp)
   write(self, "add-message.html", {"message": "Added."})
 
+class GetTimePage(webapp2.RequestHandler):
+ def get(self):
+  self.response.write(MillisecondTimestamp(datetime.now()));
+
+
 sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
 # to+UserName@messenger.appspotmail.com
 email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
@@ -1261,6 +1268,7 @@ handleList = \
   ("/report", ReportPage),
   ("/view-reports", ViewReportsPage),
   ("/add-message", AddMessagePage),
+  ("/get-time", GetTimePage),
   ProcessMailPage.mapping()
  ]
 

@@ -1,4 +1,11 @@
-var goog = {}; goog.appengine = {};
+/** @namespace
+    @type {Object} */ 
+var goog = {};
+
+/** @namespace
+    @type {Object} */ 
+goog.appengine = {};
+
 /** @constructor @param {string} str */
 goog.appengine.Channel = function (str) {};
 
@@ -20,14 +27,25 @@ goog.appengine.Socket.prototype.onmessage = function (var_args) {};
     @return {goog.appengine.Socket} */
 goog.appengine.Channel.prototype.open = function (obj) {};
 
-/** @typedef {HTMLAudioElement} */
-var Audio;
+//* @typedef {HTMLAudioElement} */
+//var Audio;
 
-/** @constructor */
-Window.prototype.Notification = function (title, options) {};
+//* @constructor */
+//Window.prototype.Notification = function (title, options) {};
 
-var console = {};
-/** @param {...} var_args */
-console.log = function (var_args) {};
+//var console = {};
+//* @param {...} var_args */
+//console.log = function (var_args) {};
 
+/** @type {NotificationCenter} */
 var webkitNotifications = Window.prototype.webkitNotifications;
+
+/** @param {function()|function({timeRemaining:function():number, didTimeout: boolean})} task
+    @param {{timeout: number}=} options */
+window.requestIdleCallback = function (task, options) {};
+
+/** @param {function()} task */
+window.setImmediate = function (task) {};
+
+/** @param {function()} task */
+window.msSetImmediate = function (task) {};

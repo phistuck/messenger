@@ -21,9 +21,9 @@
   <div class="fetch-more-messages"><a data-action="fetch-more-messages"
        href="#fetch-more-messages">Show more messages</a></div>
   <div id="presence-data">
-   {% if desktop_mode %}{% if dev_mode %}<!--<a data-action="exit-application" href="#">X</a>-->{% endif %}{% endif %}<a
+   {% if desktop_mode %}{% if dev_mode %}<!--<a data-action="exit-application" href="#">X</a>-->{% endif %}{% endif %}{% if not normal %}<a
       href="/sign-out"><img border="0"
-      src="images/sign-out.png" width="15" height="15" alt="Sign Out"/></a><a
+      src="images/sign-out.png" width="15" height="15" alt="Sign Out"/></a>{% endif %}<a
       data-action="settings" href="#settings"><img data-action="settings"
       src="images/settings.png" width="15" border="0"
       height="15" alt="Settings"/></a><a data-action="clear-conversation"
@@ -34,10 +34,12 @@
       data-action="re-enable-notifications"
       src="images/notifications-disabled.png" width="15" height="15"
       alt="Re-enable sound/desktop notifications"/></a>
-   <div class="connection-state">Connecting...</div>
-   <span class="offline"></span>
+   <span id="connection-state" class="connection-state">Connecting...</span>
+   <a id="other-conversations" data-action="show-other-conversations"
+      href="#" data-url="/converse?from={{ user }}&to=$name${% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}{% if test %}&test=1{% endif %}"></a>
+   <span id="presence-state" class="offline"></span>
    {{ to }}
-   <span class="location"></span>
+   <span id="presence-location" class="location"></span>
   </div>
   <div id="dialog"></div>
   <div id="new-messages-arrow">&#160;</div>
@@ -75,10 +77,11 @@
       Enable native desktop notifications</label>
     </div>
     <div>
-     <a href="/converse?from={{ user }}&to={{ to }}&test={{ test }}&manage=1">
+     <a href="/converse?from={{ user }}&to={{ to }}&test={{ test }}&manage=1{% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}">
       Let me delete messages
      </a>
     </div>
+   </form>
   </div>
   <div id="outro" class="outro"></div><form name="messaging-form"
        class="messaging-form" action="/send-message" method="post">

@@ -1,0 +1,1 @@
+"python.exe" -u "dev_appserver.py" -A messenger ..\

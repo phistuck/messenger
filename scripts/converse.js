@@ -26,6 +26,7 @@ var main = {};
 //* @namespace The main and only global. */
 // window.main = {};
 //}
+
 if (!main.$)
 {
  /** @namespace Utility functions. */
@@ -100,7 +101,8 @@ main.$.firstTag =
   return (main.$.tag(tagName, elementOrDocument) || [null])[0];
  };
 /** @param {string} text
-    @param {Document=} document */
+    @param {Document=} document
+    @returns {Text} */
 main.$.createText =
  function (text, document)
  {
@@ -109,7 +111,8 @@ main.$.createText =
 /** @param {string} name
     @param {?string=} className
     @param {?string=} text
-    @param {Document=} document */
+    @param {Document=} document
+    @returns {Element} */
 main.$.createElement =
  function (name, className, text, document)
  {
@@ -125,11 +128,12 @@ main.$.createElement =
   }
   return element;
  };
-/** @param {string} content */
+/** @param {string} content
+    @returns {boolean} */
 main.$.isRTL =
  function (content)
  {
-  var letters;
+  var /** @type {string} */ letters;
   if (!main.$.letterPattern)
   {
    main.$.letterPattern = new RegExp("^[^a-zא-ת]+", "gi");
@@ -138,15 +142,25 @@ main.$.isRTL =
   return letters.length > 0 && letters.charCodeAt(0) > 1487 &&
          letters.charCodeAt(0) < 1515;
  };
+/** @param {string} originalText
+    @returns {string} */
 main.$.translateHebrewToEnglish =
  function (originalText)
  {
-  var englishKeys = "azsxedcrfvtgbyhnujmikolp;",
-      hebrewKeys = "שזדסקגברכהאענטימוחצןלםךפף",
-      englishSymbolKeys = ",.'/qw", hebrewSymbolKeys = "תץ,./'",
-      letterLength = englishKeys.length,
-      symbolLength = englishSymbolKeys.length,
-      i, j, character, texts, text, textItemCount;
+  var /** @const {string} */ englishKeys = "azsxedcrfvtgbyhnujmikolp;",
+      /** @const {string} */ hebrewKeys = "שזדסקגברכהאענטימוחצןלםךפף",
+      /** @const {string} */ englishSymbolKeys = ",.'/qw",
+      /** @const {string} */ hebrewSymbolKeys = "תץ,./'",
+      /** @type {number} */ letterLength = englishKeys.length,
+      /** @type {number} */ symbolLength = englishSymbolKeys.length,
+      /** @type {number} */ i,
+      /** @type {number} */ j,
+      /** @type {string} */ character,
+      /** @type {Array<string>} */ texts,
+      /** @type {string} */ text,
+      /** @type {number} */ textItemCount;
+
+  /** @param {string} character */
   function reverseParentheses(character)
   {
    return character === "("? ")": "(";
@@ -185,7 +199,7 @@ main.$.translateHebrewToEnglish =
   }
   else
   {
-   texts = [originalText];
+   texts = /** @type {Array<string>} */ ([originalText]);
   }
   textItemCount = texts.length;
   /*jslint plusplus: true*/
@@ -217,41 +231,62 @@ main.$.translateHebrewToEnglish =
   }
   return originalText;
  };
+/** @param {Element} element
+    @param {function(Element):boolean} isValidElementFilter
+    @param {function(Text, Element)} runAction */
 main.$.findTextNodes =
  function (element, isValidElementFilter, runAction)
  {
-  var i, length = element.childNodes.length;
+  var /** @type {number} */ i,
+      /** @type {NodeList<Element>} */ children = element.childNodes,
+      /** @type {number} */ length = children.length,
+      /** @type {Node} */ currentNode,
+      /** @type {Element} */ currentElement;
   /*jslint plusplus: true*/
   for (i = 0; i < length; i++)
   {
+   currentNode = /** @type {Node} */ (children[i]);
   /*jslint plusplus: true*/
-   if (element.childNodes[i].nodeType === 1)
+   if (currentNode.nodeType === 1)
    {
     if (isValidElementFilter && !isValidElementFilter(element))
     {
      break;
     }
     main.$.findTextNodes(
-     element.childNodes[i], isValidElementFilter, runAction);
+     /** @type {Element} */ (currentNode), isValidElementFilter, runAction);
    }
-   if (element.childNodes[i].nodeType === 3)
+   if (currentNode.nodeType === 3)
    {
-    runAction(element.childNodes[i], element);
+    runAction(/** @type {Text} */ (currentNode), element);
    }
   }
  };
+/** @param {Element} element */
 main.$.linkifyURLs =
  function (element)
  {
   main.$.findTextNodes(
    element,
-   function (element)
+   /** @param {Element} foundElement
+       @returns {boolean} */
+   function (foundElement)
    {
-    return element.tagName !== "A";
+    return foundElement.tagName !== "A";
    },
+   /** @param {Text} textNode
+       @param {Element} containingElement */
    function (textNode, containingElement)
    {
-    var i, urls, length, text, html, element, url;
+    var /** @type {number} */ i,
+        /** @type {Array<string>} */ urls,
+        /** @type {number} */ length,
+        /** @type {string} */ text,
+        /** @type {string} */ html,
+        /** @type {Element} */ element,
+        /** @type {Node} */ linkifiedNode,
+        /** @type {string} */ url;
+
     html = text = textNode.nodeValue;
     urls = html.match(main.$.urlPattern);
     if (urls)
@@ -268,49 +303,57 @@ main.$.linkifyURLs =
      }
      if (text !== html)
      {
-      element = main.$.createElement("span");
+      linkifiedNode = element = main.$.createElement("span");
       element.innerHTML = html;
       if (element.childNodes.length === 1)
       {
-       element = element.childNodes[0];
+       linkifiedNode = /** @type {Text} */ (element.childNodes[0]);
       }
-      containingElement.replaceChild(element, textNode);
+      containingElement.replaceChild(linkifiedNode, textNode);
      }
     }
    });
  };
+/** @returns {!XMLHttpRequest} */
 main.$.createRequest =
  function ()
  {
-  var Request = window.XMLHttpRequest;
+  var /** @type {function(new:XMLHttpRequest)} */
+      Request = window.XMLHttpRequest,
+      /** @type {function(new:XMLHttpRequest, string, string=)} */
+      ActiveX;
+
   if (Request)
   {
    return new Request();
   }
-  Request = window.ActiveXObject;
-  if (Request)
+  ActiveX =
+   /** @type {function(new:XMLHttpRequest, string, string=)} */
+   (window.ActiveXObject);
+
+  if (ActiveX)
   {
    try
    {
-    return new Request("Msxml2.XMLHTTP.6.0");
+    return new ActiveX("Msxml2.XMLHTTP.6.0");
    }
    catch (e1)
    {
     try
     {
-     return new Request("Msxml2.XMLHTTP.3.0");
+     return new ActiveX("Msxml2.XMLHTTP.3.0");
     }
     catch (e2)
     {
      try
      {
-      return new Request("Msxml2.XMLHTTP");
+      return new ActiveX("Msxml2.XMLHTTP");
      }
      catch (e3)
      {
       try
       {
-       return new Request("Microsoft.XMLHTTP");
+       return new ActiveX("Microsoft.XMLHTTP");
       }
       catch (e4)
       {
@@ -320,13 +363,18 @@ main.$.createRequest =
    }
   }
   alert("You have a weirdly old browser. Sorry, bye.");
+  throw "The browser is missing an HTTP request sending method.";
  };
-/** @param {string} name */
+/** @param {string} name
+    @returns {?string|undefined} */
 main.$.getCookie =
  function (name)
  {
-  var cookie, cookies = main.doc.cookie.split(/[\s]*;[\s]*/g),
-      i = 0, length;
+  var /** @type {Array<string>} */ cookie,
+      /** @type {Array<string>} */
+      cookies = main.doc.cookie.split(/[\s]*;[\s]*/g),
+      /** @type {number} */ i = 0,
+      /** @type {number} */ length;
   /*jslint plusplus: true*/
   for (length = cookies.length; i < length; i++)
   {
@@ -337,31 +385,34 @@ main.$.getCookie =
     return main.$.decode(cookie[1]);
    }
   }
+  return;
  };
 /** @param {?string} text
-    @return {?string} */
+    @returns {?string} */
 main.$.decode =
  function (text)
  {
   return text? decodeURIComponent(text): null;
  };
 /** @param {?string} text
-    @return {?string} */
+    @returns {?string} */
 main.$.encode =
  function (text)
  {
   return text? encodeURIComponent(text): null;
  };
 /** @param {string} name
-    @param {string} value
+    @param {string|number|boolean} value
     @param {Date=} expiration */
 main.$.setCookie =
  function (name, value, expiration)
  {
   main.doc.cookie =
-   main.$.encode(name) + "=" + main.$.encode(value) + "; " +
+   main.$.encode(name) + "=" + main.$.encode(String(value)) + "; " +
    (expiration? "expires=" + expiration.toGMTString() + "; ": "") + "path=/";
  };
+/** @param {string} name
+    @returns {?string|undefined} */
 main.$.load =
  function (name)
  {
@@ -380,10 +431,13 @@ main.$.load =
   }
   return main.$.getCookie(name);
  };
+/** @param {string} name
+    @param {string|number|boolean} value
+    @param {Date=} expiration */
 main.$.save =
  function (name, value, expiration)
  {
-  var storage;
+  var /** @type {Storage} */ storage;
   if (main.support.storage)
   {
    storage = (!expiration && window.sessionStorage) || window.localStorage;
@@ -394,6 +448,7 @@ main.$.save =
    main.$.setCookie(name, value, expiration);
   }
  };
+/** @param {Event} e */
 main.$.preventDefault =
  function (e)
  {
@@ -406,12 +461,21 @@ main.$.preventDefault =
    e.returnValue = false;
   }
  };
+/** @param {!Function} task */
 main.$.scheduleTask =
  function (task)
  {
-  if (window.setImmediate)
+  if (window.requestIdleCallback)
+  {
+   window.requestIdleCallback(task, {timeout: 1});
+  }
+  else if (window.setImmediate)
   {
    window.setImmediate(task);
+  }
+  else if (window.msSetImmediate)
+  {
+   window.msSetImmediate(task);
   }
   else
   {
@@ -423,7 +487,7 @@ main.$.scheduleTask =
 main.$.parseDateString =
  function (originalTimestamp)
  {
-  var timestamp = new Date(originalTimestamp);
+  var /** @type {Date} */ timestamp = new Date(originalTimestamp);
   if (!isNaN(timestamp))
   {
    return timestamp;
@@ -435,6 +499,8 @@ main.$.parseDateString =
   return timestamp;
  };
   /*jslint regexp: false*/
+/** @param {string} string
+    @returns {Object|Array|string|boolean|number} */
 main.$.parseJSON =
  function (string)
  {
@@ -442,10 +508,11 @@ main.$.parseJSON =
   {
    if (window.JSON)
    {
-    return JSON.parse(string);
+    return /** @type {Object|Array|string|boolean|number} */ (
+            JSON.parse(string));
    }
    /*jslint evil: true*/
-   return eval(string);
+   return /** @type {Object|Array|string|boolean|number} */ (eval(string));
   }
   catch (e)
   {
@@ -454,15 +521,15 @@ main.$.parseJSON =
   }
  };
 
-/** @type {Document} */
+/** @type {!Document} */
 main.doc = document;
 
 /** @type {Element} */
 main.body = main.$.firstTag("body");
 /** @type {Element} */
 main.dialog = main.$.id("dialog");
-/** @type {Element} */
-main.form = main.doc.forms["messaging-form"];
+/** @type {HTMLFormElement} */
+main.form = /** @type {HTMLFormElement} */ (main.doc.forms["messaging-form"]);
 /** @type {Element} */
 main.html = main.doc.documentElement;
 /** @type {string} */
@@ -497,6 +564,8 @@ main.lastMessageID = "";
 main.originalTitle = main.doc.title || "";
 /** @type {string} */
 main.lastMessageTimestamp = "";
+/** @type {Date} */
+main.lastMessageTimestampDate = null;
 /** @type {number} */
 main.lastTypingIndicationTimestamp = (new Date()).getTime() - 5000;
 /** @type {number} */
@@ -523,10 +592,10 @@ main.presenceIndication =
  /** @type {!Element} */ (main.$.id("presence-data"));
 /** @type {!Element} */
 main.presenceLocation =
- /** @type {!Element} */ (main.$.tag("span", main.presenceIndication)[1]);
+ /** @type {!Element} */ (main.$.id("presence-location"));
 /** @type {!Element} */
 main.presenceStatus =
- /** @type {!Element} */ (main.$.firstTag("span", main.presenceIndication));
+ /** @type {!Element} */ (main.$.id("presence-state"));
 /** @type {number} */
 main.pingInterval = 30000;
 /** @type {boolean} */
@@ -545,12 +614,10 @@ main.shouldRefreshField =
  /** @type {!Element} */ (main.$.id("should-refresh"));
 /** @type {number} */
 main.connectivityTimeoutTimer = 0;
-/** @type {XMLHttpRequest|ActiveXObject} */
+/** @type {XMLHttpRequest} */
 main.reclaimTokenRequest = null;
 /** @type {number} */
 main.stalePresenceTextTimer = 0;
-/** @type {Element} */
-main.statusMessage = main.$.firstTag("div", main.form);
 /** @type {boolean} */
 main.testDatabase = false;
 /** @type {boolean} */
@@ -569,27 +636,79 @@ main.newMessageIcon = "/images/new-message-icon.ico";
 main.currentIcon = main.normalIcon;
 /** @type {HTMLLinkElement} */
 main.eIcon = null;
+/** @type {Array<string>} */
+main.otherConversationDetails = [];
+/** @type {Element} */
+main.eOtherConversations = main.$.id("other-conversations");
+/** @type {boolean} */
+main.otherConversations = false;
+/** @type {{localTime: number, serverTime: number}} */
+main.timeSynchronization =
+ {
+  localTime: 0,
+  serverTime: 0
+ };
 
+
+main.updateSynchronizedTime =
+ function ()
+ {
+  var /** @type {XMLHttpRequest} */ request = main.$.createRequest(),
+      /** @type {number} */ timer;
+
+  /** @param {number} local
+      @param {number} server */
+  function setTime(local, server)
+  {
+   main.timeSynchronization.localTime = local;
+   main.timeSynchronization.serverTime = server;
+  }
+
+  request.open("get", "/get-time", true);
+  request.timeout = 5000;
+  request.onreadystatechange =
+   function ()
+   {
+    if (request.readyState === 4 && request.status === 200)
+    {
+     clearTimeout(timer);
+     setTime((new Date()).getTime(), main.$.parseDateString(request.responseText).getTime());
+    }
+   };
+  timer =
+   setTimeout(
+    function ()
+    {
+     request.onreadystatechange = null;
+     request = null;
+     setTime(0, 0);
+    },
+    5000);
+   request.send();
+ };
+/** @param {boolean} newMessage */
 main.updateIcon =
  function (newMessage)
  {
+  var /** @type {HTMLLinkElement} */ eIcon;
   if (!newMessage && (main.currentIcon === main.normalIcon))
   {
    return;
   }
   if (!main.eIcon)
   {
-   main.eIcon = /** @type {HTMLLinkElement} */ (main.$.id("favicon"));
-   if (!main.eIcon)
+   eIcon = /** @type {HTMLLinkElement} */ (main.$.id("favicon"));
+   if (!eIcon)
    {
-    main.eIcon = /** @type {HTMLLinkElement} */ (main.$.createElement("link"));
-    main.eIcon.setAttribute("rel", "icon");
-    main.eIcon.setAttribute("href", main.currentIcon);
-    main.eIcon.setAttribute("type", "image/x-icon");
-    main.eIcon =
+    eIcon = /** @type {HTMLLinkElement} */ (main.$.createElement("link"));
+    eIcon.setAttribute("rel", "icon");
+    eIcon.setAttribute("href", main.currentIcon);
+    eIcon.setAttribute("type", "image/x-icon");
+    eIcon =
      /** @type {HTMLLinkElement} */
      (main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild));
    }
+   main.eIcon = eIcon;
   }
   main.currentIcon =
    main.eIcon.href = newMessage? main.newMessageIcon: main.normalIcon;
@@ -614,6 +733,7 @@ main.finishAnimation =
    {
     main.animating = false;
     main.wasAtScrollBottom = true;
+    main.resizeFields();
    });
  };
 main.scrollToBottom =
@@ -623,15 +743,18 @@ main.scrollToBottom =
   window.scroll(0, main.body.scrollHeight);
   main.finishAnimation();
  };
-/** @param {Event} e */
+/** @param {Event|KeyboardEvent} e */
 main.handleGlobalShortcuts =
  function (e)
  {
-  var alt, key, control;
+  var /** @type {boolean} */ alt,
+      /** @type {number} */ key,
+      /** @type {boolean} */ control;
   if (!e)
   {
-   e = window.event;
+   e = /** @type {KeyboardEvent} */ (window.event);
   }
+
   key = e.keyCode;
   alt = e.altKey;
   control = e.ctrlKey;
@@ -642,7 +765,10 @@ main.handleGlobalShortcuts =
    main.toggleConcealmentMode();
   }
   // F2 toggles new message notifications.
-  else if (key === 113 || (key === 229 && e.keyIdentifier === "U+000008"))
+  // A special Nokia phone buttons toggles them as well.
+  else if (key === 113 ||
+           (key === 229 &&
+            /** @type {KeyboardEvent} */ (e).keyIdentifier === "U+000008"))
   {
    if (main.newMessages)
    {
@@ -683,7 +809,7 @@ main.focusMessageField =
 main.updateHTMLIndicator =
  function ()
  {
-  var classList = [];
+  var /** @type {Array<string>} */ classList = [];
   if (main.support.desktopNotifications)
   {
    classList.push("desktop-notifications");
@@ -697,7 +823,7 @@ main.updateHTMLIndicator =
 main.updateBodyIndicator =
  function ()
  {
-  var classList = [];
+  var /** @type {Array<string>} */ classList = [];
   if (main.concealment)
   {
    classList.push("concealment");
@@ -736,6 +862,10 @@ main.updateBodyIndicator =
    {
     classList.push("thinking");
    }
+   if (main.otherConversations)
+   {
+    classList.push("other-conversations");
+   }
   }
   main.body.className = classList.join(" ");
  };
@@ -758,30 +888,36 @@ main.updateRecipientStatus =
 main.updateRecipientTyping =
  function (typingTimestamp, serverTimestamp)
  {
-  var typing;
-  function updateTyping(typing)
+  var /** @type {boolean} */ typing = false;
+
+  /** @param {boolean=} isTyping */
+  function updateTyping(isTyping)
   {
-   typing = typing || false;
-   if (main.typing !== typing)
+   isTyping = isTyping || false;
+   if (main.typing !== isTyping)
    {
-    main.typing = typing;
+    main.typing = isTyping;
     main.updateBodyIndicator();
    }
   }
 
   clearTimeout(main.recipientTypingTimeoutTimer);
-  
-  typing =
-   serverTimestamp &&
-   ((serverTimestamp - (new Date(typingTimestamp)).getTime()) < 7000);
+
+  if (serverTimestamp &&
+      ((serverTimestamp - (new Date(typingTimestamp)).getTime()) < 7000))
+  {
+   typing = true;
+  }
   
   updateTyping(typing);
 
   if (typing)
   {
+   /** @type {number} */
    main.recipientTypingTimeoutTimer = setTimeout(updateTyping, 8000);
   }
  };
+/** @param {boolean} thinking */
 main.updateRecipientThinking =
  function (thinking)
  {
@@ -815,11 +951,17 @@ main.showBlockedPopupMessage =
 main.updatePresenceData =
  function (indicateTypingState)
  {
-  
-  var /** @type {XMLHttpRequest|ActiveXObject} */
+  var /** @type {?XMLHttpRequest} */
       request = main.messages.newRequest, 
-      url, typing = "", now = (new Date()).getTime(),
+      /** @type {string} */ 
+      url,
+      /** @type {string} */ 
+      typing = "",
+      /** @type {number} */ 
+      now = (new Date()).getTime(),
+      /** @type {boolean} */ 
       typedLately = (now - main.lastTypingIndicationTimestamp) < 5000;
+
   if (indicateTypingState && typedLately)// ||
       //(!indicateTypingState &&
        //(now - main.lastConnectivitySignalTimestamp) < 25000))
@@ -847,6 +989,7 @@ main.updatePresenceData =
    (main.thinking? "&thinking=1": "") + typing + (main.atWork? "&work=1": "") +
    (main.location? "&location=" + main.$.encode(main.location): "") +
    (main.testDatabase? "&test=1": "") +
+   // Unusued, meant to disable caching.
    "&now=" + (new Date().getTime());
   request = main.messages.newRequest = main.$.createRequest();
   request.onreadystatechange =
@@ -872,10 +1015,14 @@ main.updatePresenceData =
     },
     20000);
  };
+/** @param {string} code
+    @param {string} value */
 main.sendReport =
  function (code, value)
  {
-  var request = main.$.createRequest(),
+  var /** @type {XMLHttpRequest} */
+      request = main.$.createRequest(),
+      /** @type {string} */
       parameters =
        "type=" + main.$.encode(code) + "&value=" + main.$.encode(value) +
        (main.testDatabase? "&test=1": "");
@@ -884,12 +1031,26 @@ main.sendReport =
    "Content-Type", "application/x-www-form-urlencoded");
   request.send(parameters);
  };
+/** @param {{data: Object}} message */
 main.handleMessage =
  function (message)
  {
   /*jslint sub: true*/
-  var data = main.$.parseJSON(message["data"] || "{}"),
-      value = data["value"], lastMessageTimestamp, lastMessageTimestampDate;
+  var /** @type {Object} */
+      data =
+      /** @type {Object} */
+      (
+       /** @type {Object} */
+       (main.$.parseJSON(/** @type {string} */ (message["data"])))) ||
+       /** @type {Object} */
+       ({}),
+      /** @type {Object<string, string>|Array<Object>|Object|string} */
+      value = data["value"],
+      /** @type {string} */
+      lastMessageTimestamp,
+      /** @type {Date} */
+      lastMessageTimestampDate;
+
   //console.log(message.data);
   /*jslint sub: false*/
   clearTimeout(main.connectivityTimeoutTimer);
@@ -900,7 +1061,7 @@ main.handleMessage =
    /*jslint sub: true, evil: true*/
    if (data["type"] === "command")
    {
-    eval(data["value"]);
+    eval(/** @type {string} */ (value));
     return;
    }
    /*jslint sub: false, evil: true*/
@@ -908,14 +1069,16 @@ main.handleMessage =
 
   if (!main.settings.waitingForFetch)
   {
-   lastMessageTimestamp = data["last-message-timestamp"];
+   lastMessageTimestamp =
+    /** @type {string} */ (data["last-message-timestamp"]);
    if (lastMessageTimestamp &&
        lastMessageTimestamp !== main.lastMessageTimestamp)
    {
-    lastMessageTimestampDate = new Date(data["last-message-timestamp-date"]);
+    lastMessageTimestampDate =
+     new Date(/** @type {string} */ (data["last-message-timestamp-date"]));
     if (lastMessageTimestampDate < main.lastMessageTimestampDate)
     {
-     main.lastMessageTimestamp = data["last-message-timestamp"];
+     main.lastMessageTimestamp = lastMessageTimestamp;
      main.lastMessageTimestampDate = lastMessageTimestampDate;
     }
     main.settings.offline = true;
@@ -936,26 +1099,31 @@ main.handleMessage =
     break;
    case "old-messages":
     /*jslint sub: true*/
-    main.messages.addOldMessages(value, data["timestamp"]);
+    main.messages.addOldMessages(
+     /** @type {Array<Object<string, string>>} */ (value), data["timestamp"]);
     /*jslint sub: false*/
     break;
    case "queued-messages":
-    main.messages.addQueuedMessages(value);
+    main.messages.addQueuedMessages(
+     /** @type {Array<Object<string, string>>} */ (value));
     break;
    case "message":
     /*jslint sub: true*/
     main.messages.addMessage(
-     value, data["key"], data["accurate-timestamp"],
+     /** @type {Object<string, string>} */ (value),
+     data["key"], data["accurate-timestamp"],
      data["accurate-timestamp-date"], data["unique-id"]);
+    main.messages.reportDelays(data["accurate-timestamp-date"]);
     /*jslint sub: false*/
     break;
    case "remove-message":
-    /*jslint sub: true*/
-    main.messages.removeMessageElement(value);
-    /*jslint sub: false*/
+    main.messages.removeMessageElement(/** @type {string} */ (value));
     break;
    case "presence":
-    main.updatePresence(value, data["server-timestamp"]);
+    /*jslint sub: true*/
+    main.updatePresence(
+     /** @type {Object<string, ?>} */ (value), data["server-timestamp"]);
+    /*jslint sub: false*/
     if (main.settings.waitingForPresence)
     {
      main.messages.fetch(null, true);
@@ -964,33 +1132,52 @@ main.handleMessage =
     break;
   }
  };
+/** @param {Object<string, ?>} data
+    @param {string} serverTimestampText */
 main.updatePresence =
  function (data, serverTimestampText)
  {
   /*jslint sub: true*/
-  var recipientData = data[main.recipient],
+  var /** @type {Object<string, ?>} */
+      recipientData = /** @type {Object<string, ?>} */ (data[main.recipient]),
+       /** @type {number} */
       serverTimestamp = main.$.parseDateString(serverTimestampText).getTime();
-  main.updateRecipientThinking(recipientData? recipientData["thinking"]: false);
+  main.updateRecipientThinking(
+   recipientData?
+    /** @type {boolean} */ (recipientData["thinking"]):
+    false);
   main.updateRecipientStatus(
-   recipientData? recipientData["timestamp"]: 0, serverTimestamp);
-  main.updateRecipientLocation(recipientData? recipientData["location"]: "");
+   recipientData?
+    /** @type {number} */ (recipientData["timestamp"]):
+    0,
+   serverTimestamp);
+  main.updateRecipientLocation(
+   recipientData?
+    /** @type {string} */ (recipientData["location"]):
+    "");
   main.updateRecipientTyping(
-   recipientData? recipientData["typing"]: 0, serverTimestamp);
+   recipientData?
+    /** @type {number} */ (recipientData["typing"]):
+    0,
+   serverTimestamp);
   /*jslint sub: false*/
  };
 /** @param {Element} receptor
-    @param {boolean=} before */
+    @param {boolean=} before
+    @returns {Element} */
 main.replaceReceptor =
  function (receptor, before)
  {
-  var newReceptor = main.doc.createElement("div");
+  var /** @type {Element} */
+      newReceptor = main.doc.createElement("div");
   newReceptor.id = receptor.id;
   newReceptor.className = receptor.className;
   receptor.id = "";
   receptor.className = "";
-  return receptor.parentNode.insertBefore(
-          newReceptor,
-          before? receptor: receptor.nextSibling);
+  return /** @type {Element} */ (
+          receptor.parentNode.insertBefore(
+           newReceptor,
+           before? receptor: receptor.nextSibling));
  };
 /** @param {string|Element} htmlOrElements
     @param {boolean=} alert */
@@ -1015,14 +1202,25 @@ main.showDialog =
 main.clearDialog =
  function (e)
  {
+  var /** @type {Element} */ source;
+  
   if (!e)
   {
-   e = window.event;
+   e = /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
   }
-  if (e && e.type === "keyup" && e.keyCode !== 27)
+
+  if (e)
   {
-   return;
+   source = /** @type {Element} */ (e.target || e.srcElement);
+
+   if ((e.type === "keyup" &&
+        /** @type {KeyboardEvent} */ (e).keyCode !== 27) ||
+       (e.type === "click" && source.getAttribute("data-keep")))
+   {
+    return;
+   }
   }
+
   main.dialog.style.display = "none";
   main.dialog.innerHTML = "";
   main.doc[main.$.removeEventString](
@@ -1032,12 +1230,13 @@ main.clearDialog =
 main.handleClicks =
  function (e)
  {
-  var action, source;
+  var /** @type {string} */ action,
+      /** @type {?Element|undefined} */ source;
   if (!e)
   {
-   e = window.event;
+   e = /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
   }
-  source = e.target || e.srcElement;
+  source = /** @type {Element} */ (e.target || e.srcElement);
   action = source.getAttribute && source.getAttribute("data-action");
   if (!action)
   {
@@ -1079,16 +1278,19 @@ main.handleClicks =
    case "resend-undelivered":
     main.messages.resendUndelivered(e, source);
     break;
+   case "show-other-conversations":
+    main.messages.showOtherConversationDialog(e);
   }
  };
 main.animateScrollingToTheBottom =
  function ()
  {
-  var currentScroll = -1;
+  var /** @type {number} */ currentScroll = -1;
   main.animating = true;
   function scrollDown()
   {
-   var scrollTop = (main.body.scrollTop || main.html.scrollTop);
+   var /** @type {number} */
+       scrollTop = (main.body.scrollTop || main.html.scrollTop);
    if (currentScroll !== scrollTop)
    {
     currentScroll = scrollTop;
@@ -1106,7 +1308,9 @@ main.animateScrollingToTheBottom =
 main.createChannel =
  function ()
  {
-  var channel, socket, interval = main.channelToken? 3e4: 3e5;
+  var /** @type {goog.appengine.Channel} */ channel,
+      /** @type {goog.appengine.Socket} */ socket,
+      /** @type {number} */ interval = main.channelToken? 3e4: 3e5;
 
   if (interval !== main.pingInterval)
   {
@@ -1136,13 +1340,21 @@ main.createChannel =
     main.reopenChannel();
     //main.$.log("close" + Date());
    };
+  /** @param {DOMException|DOMError} e
+      @param {string} a
+      @param {string} b
+      @param {string} c */
   socket.onerror =
    function (e, a, b, c)
    {
+    var /** @type {string} */
+        description =
+         e? /** @type {string} */ (e["description"]) || e.message || "": "";
     main.sendReport(
      "channel-error",
-     [e, e.code, typeof e.code, e.description, a, b, c].join(","));
-    if (e && e.description.replace(/\+/g, " ").indexOf("Token time") > -1)
+     [e, e.code, typeof e.code,
+      description, e.message, a, b, c].join(","));
+    if (description.replace(/\+/g, " ").indexOf("Token time") > -1)
     {
      main.reclaimToken();
     }
@@ -1178,7 +1390,8 @@ main.reopenChannel =
 main.reclaimToken =
  function ()
  {
-  var /*iFrame = main.$.firstTag("iframe"), */request;
+  var /*iFrame = main.$.firstTag("iframe"), */
+      /** @type {XMLHttpRequest} */ request;
   /*jslint plusplus: true*/
   if (main.channelCount === 21)
   {
@@ -1305,7 +1518,7 @@ main.toggleConcealmentMode =
     main.scrollToBottom();
     //main.wasAtScrollBottom = false;
    }
-   main.resizeFields();
+   main.handleResize();
   }
  };
 main.hideAndFocus =
@@ -1315,11 +1528,13 @@ main.hideAndFocus =
   alert("Oops! Something went wrong, please, restart the application.");
   main.doc.location.href = "/sign-out";
  };
+/** @param {Object<string, string>|string} data */
 main.dispatchAction =
  function (data)
  {
   /*jslint sub: true*/
-  var action = typeof data === "string"? data: data["action"];
+  var /** @type {string} */
+      action = typeof data === "string"? data: data["action"];
   /*jslint sub: false*/
   switch (action)
   {
@@ -1345,7 +1560,18 @@ main.dispatchAction =
 main.resizeFields =
  function ()
  {
-  var documentWidth = main.html.clientWidth || (screen.width - 10), width;
+  var /** @type {number} */ documentWidth,
+      /** @type {number} */ width;
+
+  // While it is a combined assumption, every browser that supports calc(),
+  // supports media queries.
+  // When media queries kick in, this calculation is redundant.
+  if (main.support.calcValue)
+  {
+   return;
+  }
+
+  documentWidth = main.html.clientWidth || (screen.width - 10);
   if (documentWidth < 300)
   {
    main.support.screenSize = "small-mobile";
@@ -1362,6 +1588,11 @@ main.resizeFields =
   main.cannedMessageField.style.width = (width - 5) + "px";
   main.messageField.style.width = width  + "px";
   main.updateHTMLIndicator();
+ };
+main.handleResize =
+ function ()
+ {
+  main.resizeFields();
   if (main.wasAtScrollBottom)
   {
    main.scrollToBottom();
@@ -1382,7 +1613,19 @@ main.handleScroll =
 main.hideRedundantOutro =
  function ()
  {
-  var form = main.form, element = main.$.id("outro"), elementTop, formTop;
+  var /** @type {HTMLFormElement} */ form,
+      /** @type {Element} */ element,
+      /** @type {number} */ elementTop,
+      /** @type {number} */ formTop;
+
+  if (main.support.calcValue)
+  {
+   return;
+  }
+
+  form = main.form;
+  element = main.$.id("outro");
+
   element.style.cssText = "";
   if (element.getBoundingClientRect &&
       form.getBoundingClientRect)
@@ -1400,16 +1643,19 @@ main.hideRedundantOutro =
 main.initialize =
  function ()
  {
-  /** @type {!string} */
+  /** @param {string} name
+      @returns {string} */
   function get(name)
   {
    return main.html.getAttribute("data-" + name);
   }
   function checkLocation()
   {
+   /** @param {GeolocationPosition} position */
    function storeLocation(position)
    {
-    var location = position.coords.latitude + "," + position.coords.longitude;
+    var /** @type {string} */
+        location = position.coords.latitude + "," + position.coords.longitude;
     if (main.location !== location)
     {
      main.location = location;
@@ -1418,6 +1664,11 @@ main.initialize =
    }
    navigator.geolocation.getCurrentPosition(storeLocation);
   }
+
+  // Initial time synchronization after a minute.
+  setTimeout(main.updateSynchronizedTime, (MAIN_DEBUG? 5000: 60000));
+  // And then every five minute.
+  setInterval(main.updateSynchronizedTime, 300000);
 
   if (get("normal") === "1")
   {
@@ -1456,8 +1707,8 @@ main.initialize =
    checkLocation();
    setInterval(checkLocation, 60000);
   }
-  main.resizeFields();
-  window.onresize = main.resizeFields;
+  main.handleResize();
+  window.onresize = main.handleResize;
   main.handleScroll();
   window.onscroll = main.handleScroll;
   main.lastMessageTimestamp = get("last-message-timestamp");
@@ -1469,7 +1720,8 @@ main.initialize =
   main.atWork = get("at-work") === "1";
   main.desktop = get("desktop") === "1";
   /*jslint sub: true*/
-  main.testDatabase = main.form["test"].value === "1";
+  main.testDatabase =
+   /** @type {HTMLInputElement} */ (main.form["test"]).value === "1";
   /*jslint sub: false*/
   main.notifications.prepare();
   main.cannedMessageField.onchange = main.messages.useCannedMessage;
@@ -1495,7 +1747,10 @@ main.initialize =
   window.onerror =
    function ()
    {
-    var args = "[", i, length;
+    var /** @type {string} */ args = "[",
+        /** @type {number} */ i,
+        /** @type {number} */ length = arguments.length,
+        /** @type {string|number|DOMError|DOMException} */ argument;
     //if (window.JSON)
     //{
     // args = JSON.stringify(arguments);
@@ -1503,16 +1758,27 @@ main.initialize =
     //else
     //{
      /*jslint plusplus: true*/
-     for (i = 0, length = arguments.length; i < length; i++)
+     for (i = 0; i < length; i++)
      {
+      argument = /** @type {string|number|DOMError|DOMException} */ (arguments[i]);
      /*jslint plusplus: false*/
       try
       {
-       args += JSON.stringify(arguments[i]);
+       args += JSON.stringify(argument);
       }
       catch (e)
       {
-       args += arguments[i];
+       try
+       {
+        args +=
+         /** @type {number} */ (argument["code"]) +
+         "," +
+         /** @type {string} */ (argument["message"]);
+       }
+       catch (e1)
+       {
+        args += argument;
+       }
       }
       //if (i !== (length - 1))
       //{
@@ -1580,24 +1846,35 @@ main.loadSettings =
  };
 /** @namespace Browser capabilities. */
 main.support = {};
-(function ()
- {
-  //var element;
-  try
-  {
-   main.support.storage = window.sessionStorage || window.localStorage;
-  }
-  catch (e)
-  {
-   main.support.storage = false;
-  }
-  //element = main.$.createElement("div");
-  //element.style.position = "fixed";
-  //main.support.fixedPosition = element.style.position === "fixed";
- }());
+
+/** @type {?Storage} */
+main.support.storage = null;
+
+try
+{
+ main.support.storage = window.sessionStorage || window.localStorage;
+}
+catch (ignore)
+{
+}
+
+/** @type {boolean} */
 main.support.desktopNotifications = false;
+/** @type {boolean} */
 main.support.nativeDesktopNotifications = false;
+/** @type {string} */
 main.support.screenSize = "";
+
+/** @type {boolean} */
+main.support.calcValue =
+ (function ()
+  {
+   // Inspired by Modernizr.
+   var /** @type {Element} */ element = document.createElement("div");
+   element.style.cssText =
+    "width: -webkit-calc(1px); height: -moz-calc(1px); padding-top: calc(1px)";
+   return !!element.style.length;
+  }());
 
 if (!main.settings)
 {
@@ -1607,22 +1884,35 @@ if (!main.settings)
 
 main.settings.savedSettings =
  {
+  /** @type {boolean} */
   popups: true,
+  /** @type {boolean} */
   desktop: true,
+  /** @type {boolean} */
   sound: true
  };
+/** @type {boolean} */
 main.settings.offline = true;
+/** @type {boolean} */
 main.settings.waitingForFetch = false;
+/** @type {boolean} */
 main.settings.waitingForPresence = false;
-main.settings.form = main.doc.forms["settings-form"];
+/** @type {HTMLFormElement} */
+main.settings.form =
+ /** @type {HTMLFormElement} */ (main.doc.forms["settings-form"]);
+/** @type {Element} */
 main.settings.widget = main.$.id("settings");
 
 /** @param {string} fieldName
-    @param {boolean=} enable */
+    @param {string} savedSettingName
+    @param {boolean=} enable
+    @returns {boolean} */
 main.settings.getSetSetting =
  function (fieldName, savedSettingName, enable)
  {
-  var field = main.settings.form[fieldName];
+  var /** @type {HTMLInputElement} */
+      field =
+       /** @type {HTMLInputElement} */ (main.settings.form[fieldName]);
   if (typeof enable === "boolean")
   {
    field.checked = enable;
@@ -1630,21 +1920,24 @@ main.settings.getSetSetting =
   }
   return field.checked;
  };
-/** @param {boolean=} enable */
+/** @param {boolean=} enable
+    @returns {boolean} */
 main.settings.nativeDesktopNotifications =
  function (enable)
  {
   return main.settings.getSetSetting(
           "desktop-notification", "show-desktop-notification", enable);
  };
-/** @param {boolean=} enable */
+/** @param {boolean=} enable
+    @returns {boolean} */
 main.settings.soundNotifications =
  function (enable)
  {
   return main.settings.getSetSetting(
           "sound-notification", "play-sound-notification", enable);
  };
-/** @param {boolean=} enable */
+/** @param {boolean=} enable
+    @returns {boolean} */
 main.settings.showNotifications =
  function (enable)
  {
@@ -1670,12 +1963,14 @@ main.notifications.showArrow = false;
 main.notifications.enabled = true;
 /** @type {Notification} */
 main.notifications.notification = null;
-/** @type {Audio|HTMLAudioElement|Element|Node} */
+/** @type {Audio|HTMLAudioElement|HTMLEmbedElement} */
 main.notifications.sound = null;
 /** @const {string} */
 main.notifications.soundURL = "/resources/notification.mp3";
 /** @type {Element} */
 main.notifications.settings = main.$.id("notification-settings");
+/** @type {Window} */
+main.notifications.notificationPopup = null;
 
 main.notifications.suppress =
  function ()
@@ -1686,37 +1981,45 @@ main.notifications.suppress =
 main.notifications.play =
  function ()
  {
-  var sound, url;
+  var /** @type {HTMLAudioElement|HTMLEmbedElement} */ sound,
+      /** @type {string} */ url;
   if (!main.settings.soundNotifications())
   {
    return;
   }
+  
+  /** @returns {HTMLEmbedElement} */
   function createEmbed()
   {
-   var sound = main.doc.createElement("embed");
-   sound.style.position = "absolute";
-   sound.width = 1;
-   sound.height = 1;
-   return sound;   
+   var eSoundEmbed =
+    /** @type {HTMLEmbedElement} */ (main.doc.createElement("embed"));
+   eSoundEmbed.style.position = "absolute";
+   eSoundEmbed.width = "1";
+   eSoundEmbed.height = "1";
+   return eSoundEmbed;   
   }
   function append()
   {
-   main.notifications.sound = sound = main.body.appendChild(sound);
+   main.notifications.sound = sound =
+    /** @type {HTMLAudioElement|HTMLEmbedElement} */
+    (main.body.appendChild(sound));
   }
 
   sound = main.notifications.sound;
   url = main.notifications.soundURL;
 
-  if (!sound.flash &&
+  if (!/** @type {boolean} */ (sound["flash"]) &&
       (sound.parentNode ||
-       sound.html5))
+       /** @type {boolean} */ (sound["html5"])))
   {
    try
    {
     sound.src = url;
-    sound.volume =
-     parseFloat(main.settings.form["sound-notification-volume"].value) || 1;
-    sound.play();
+    sound["volume"] =
+     parseFloat(
+      /** @type {HTMLInputElement} */
+      (main.settings.form["sound-notification-volume"]).value) || 1;
+    sound["play"]();
    }
    catch (e)
    {
@@ -1731,19 +2034,19 @@ main.notifications.play =
    catch (e1)
    {
    }
-   if (!sound.html5)
+   if (!sound["html5"])
    {
     sound = createEmbed();
     sound.src = url;
     append();
-    if (!sound.play)
+    if (!sound["play"])
     {
      sound.parentNode.removeChild(sound);
      sound = createEmbed();
      sound.style.position = "absolute";
      sound.id = "audible-notification";
      sound.name = "audible-notification";
-     sound.flash = true;
+     sound["flash"] = true;
      sound.type = "application/x-shockwave-flash";
      sound.setAttribute(
       "flashvars", "file=" + url + "&autostart=true");
@@ -1757,7 +2060,9 @@ main.notifications.play =
 main.notifications.show =
  function ()
  {
-  var notification, notificationPopup, blockedPopups = false;
+  var /** @type {Notification} */ notification,
+      /** @type {Window} */ notificationPopup,
+      /** @type {boolean} */ blockedPopups = false;
   if (!main.settings.showNotifications())
   {
    return;
@@ -1773,9 +2078,11 @@ main.notifications.show =
    {
     main.notifications.notificationPopup =
      window.open(
-      "/notification", "Notification",
-     "width=400, height=80, left=" + (screen.availWidth - 400) + "," +
-     "top=" + (screen.availHeight - 100));
+      ("/notification?from=" + main.userName +
+       (main.normalMessenger? "&normal=1": "")),
+      "Notification",
+      "width=400, height=80, left=" + (screen.availWidth - 400) + "," +
+      "top=" + (screen.availHeight - 100));
     notificationPopup = main.notifications.notificationPopup;
     try
     {
@@ -1941,19 +2248,31 @@ main.notifications.create =
   {
    return new Notification(title, {body: content});
   }
-  notification =
-   webkitNotifications.createNotification(main.normalIcon, title, content);
-  notification.show();
-  return notification;
+  
+  if (window.webkitNotifications)
+  {
+   notification =
+    /** @type {Notification} */
+    (webkitNotifications.createNotification(main.normalIcon, title, content));
+   notification.show();
+   return notification;
+  }
+
+  return null;
  };
 main.notifications.prepare =
  function ()
  {
   /** @param {?string=} permission
-      @param {boolean=} doNotSet */
+      @param {boolean=} doNotSet
+      @returns {boolean} */
   function checkPermission(permission, doNotSet)
   {
    if (permission === "granted" ||
+       // Standard API.
+       (window.Notification && "permission" in Notification &&
+        Notification.permission == "granted") ||
+       // Old API, for older Chrome or maybe also Safari.
        (window.webkitNotifications &&
         webkitNotifications.checkPermission() === 0))
    {
@@ -1964,6 +2283,7 @@ main.notifications.prepare =
     }
     return true;
    }
+   return false;
   }
   
   if (!window.Notification && !window.webkitNotifications)
@@ -1972,7 +2292,7 @@ main.notifications.prepare =
   }
   main.support.desktopNotifications = true;
   main.updateHTMLIndicator();
-  /** @this {Element} */
+  /** @this {HTMLInputElement} */
   main.settings.form["desktop-notification"].onclick =
    function ()
    {
@@ -2002,12 +2322,16 @@ main.notifications.prepare =
 main.notifications.initializeSound =
  function ()
  {
-  var sound = main.doc.createElement("audio");
+  var /** @type {HTMLAudioElement} */
+      sound =
+       /** @type {HTMLAudioElement} */
+       (main.doc.createElement("audio"));
+
   if (sound.canPlayType &&
       sound.canPlayType("audio/mp3") !== "")
   {
-   sound.html5 = true;
-   sound = main.body.appendChild(sound);
+   sound["html5"] = true;
+   sound = /** @type {HTMLAudioElement} */ (main.body.appendChild(sound));
   }
   main.notifications.sound = sound;
  };
@@ -2017,8 +2341,12 @@ if (!main.messages)
  /** @namespace Message related functions. */
  main.messages = {};
 }
-/** @type {Element} */
-main.messages.confirmReadButton = main.$.id("confirm-read-messages");
+
+/** @type {string} */
+main.messages.lastTypedMessage = "";
+/** @type {HTMLButtonElement} */
+main.messages.confirmReadButton =
+ /** @type {HTMLButtonElement} */ (main.$.id("confirm-read-messages"));
 /** @const {string} */
 main.messages.cannedIndicesCookieName = "canned-indices";
 /** @type {?number} */
@@ -2029,7 +2357,7 @@ main.messages.checkerTimeoutTimer = null;
 main.messages.updatePresenceDataURL = "/update-presence-data";
 /** @type {?number} */
 main.messages.glowTimer = null;
-/** @type {XMLHttpRequest|ActiveXObject} */
+/** @type {?XMLHttpRequest} */
 main.messages.newRequest = null;
 /** @type {number} */
 main.messages.newRequestRetries = 1;
@@ -2061,6 +2389,7 @@ main.messages.clearAll =
  function ()
  {
   main.messages.iterateThroughMessages(
+   /** @param {Element} element */
    function (element)
    {
     element.className += " hidden";
@@ -2075,9 +2404,9 @@ main.messages.removeUndelivered =
   if (!message)
   {
    main.$.preventDefault(e);
-   message = dismissLink.parentNode.parentNode;
+   message = /** @type {!Element} */ (dismissLink.parentNode.parentNode);
   }
-  if (message.className.indexOf("system-message") === -1)
+  if (/** @type {!Element} */ (message).className.indexOf("system-message") === -1)
   {
    return;
   }
@@ -2088,9 +2417,9 @@ main.messages.removeUndelivered =
 main.messages.resendUndelivered =
  function (e, resendLink)
  {
-  var message;
+  var /** @type {Element} */ message;
   main.$.preventDefault(e);
-  message = resendLink.parentNode.parentNode;
+  message = /** @type {Element} */ (resendLink.parentNode.parentNode);
   if (message.className.indexOf("system-message") === -1)
   {
    return;
@@ -2100,10 +2429,10 @@ main.messages.resendUndelivered =
   {
    return;
   }
-  main.messageField.value = message.originalMessage;
-  if (message.notify)
+  main.messageField.value = /** @type {string} */ (message["originalMessage"]);
+  if (/** @type {boolean} */ (message["notify"]))
   {
-   message.notify = main.notifyRecipient.checked;
+   message["notify"] = main.notifyRecipient.checked;
   }
   main.messages.send();
   main.messages.removeUndelivered(e, resendLink, message);
@@ -2128,10 +2457,11 @@ main.messages.abortCheckerRequest =
 main.messages.confirmRead =
  function ()
  {
-  var button = main.messages.confirmReadButton;
+  var /** @type {HTMLButtonElement} */ button = main.messages.confirmReadButton;
   if (main.messages.glowTimer)
   {
-   main.messages.glowTimer = clearInterval(main.messages.glowTimer);
+   clearInterval(main.messages.glowTimer);
+   main.messages.glowTimer = null;
   }
   main.initialState = false;
   main.newMessages = false;
@@ -2170,7 +2500,8 @@ main.messages.handleMessageFieldKeyUp =
  function ()
  {
   var /** @type {HTMLTextAreaElement} */
-      eMessage = /** @type {HTMLTextAreaElement} */(main.messageField),
+      eMessage =
+       /** @type {HTMLTextAreaElement} */ (main.messageField),
       /** @type {string} */ message = eMessage.value,
       /** @type {string} */ lastMessage = main.messages.lastTypedMessage;
   if (!lastMessage || lastMessage !== message.substring(0, lastMessage.length))
@@ -2194,11 +2525,13 @@ main.messages.handleMessageFieldKeys =
       /** @type {boolean} */ mobileEnter,
       /** @type {HTMLTextAreaElement} */ message = main.messageField,
       /** @type {Element} */ source;
-  /*function cancelMeOnce(e)
+  /*
+  /** @param {Event} e * /
+  function cancelMeOnce(e)
   {
    if (!e)
    {
-    e = window.event;
+    e = /** @type {Event} * / (window.event);
    }
    if (e.keyCode === 13 || e.keyCode === 229)
    {
@@ -2208,9 +2541,9 @@ main.messages.handleMessageFieldKeys =
   }*/
   if (!e)
   {
-   e = window.event;
+   e = /** @type {Event} */ (window.event);
   }
-  source = e.target || e.srcElement;
+  source = /** @type {Element} */ (e.target || e.srcElement);
   key = e.keyCode;
 
   if (source !== message && source !== concealed)
@@ -2222,7 +2555,9 @@ main.messages.handleMessageFieldKeys =
   // which is actually shared between several keys (Enter, Backspace and more).
   // The Enter key has a specific keyIdentifier, so we use that to
   // know the real Enter key was pressed.
-  mobileEnter = key === 229 && e.keyIdentifier === "MSK";
+  mobileEnter =
+   key === 229 &&
+   /** @type {KeyboardEvent} */ (e).keyIdentifier === "MSK";
 
   if (e.altKey && key === 66)
   {
@@ -2256,10 +2591,11 @@ main.messages.handleMessageFieldKeys =
 main.messages.loadCannedMessageOrder =
  function ()
  {
-  var /** @type {string} */ rawCannedIndices =
+  var /** @type {?string|undefined} */
+      rawCannedIndices =
        main.$.load(main.messages.cannedIndicesCookieName),
-      /** @type {Array.<string>} */ cannedIndices,
-      /** @type {Array.<Element>} */ cannedMessages = [],
+      /** @type {Array<string>} */ cannedIndices,
+      /** @type {Array<!HTMLOptionElement>} */ cannedMessages = [],
       /** @type {HTMLSelectElement} */ field = main.cannedMessageField,
       /** @type {number} */ i = 0,
       /** @type {number} */ length;
@@ -2268,7 +2604,7 @@ main.messages.loadCannedMessageOrder =
    return;
   }
   cannedIndices = rawCannedIndices.split(",");
-  cannedMessages = [];
+  cannedMessages = /** @type {Array<!HTMLOptionElement>} */ ([]);
   /*jslint plusplus: true*/
   for (length = cannedIndices.length; i < length; i++)
   {
@@ -2277,7 +2613,9 @@ main.messages.loadCannedMessageOrder =
   }
   while (cannedMessages.length)
   {
-   field.insertBefore(cannedMessages.pop(), field.options[1]);
+   field.insertBefore(
+    /** @type (!HTMLOptionElement) */ (cannedMessages.pop()),
+    /** @type (!HTMLOptionElement) */ (field.options[1]));
   }
  };
 /** @param {boolean=} showArrow */
@@ -2320,10 +2658,14 @@ main.messages.notify =
 main.messages.saveCannedMessageOrder =
  function (index)
  {
-  var cannedIndices, expiration, i = 0, length,
-      name = main.messages.cannedIndicesCookieName;
-  cannedIndices = main.$.load(name);
-  cannedIndices = cannedIndices? cannedIndices.split(","): [];
+  var /** @type {?string|undefined} */ rawCannedIndices,
+      /** @type {Array.<string>} */ cannedIndices,
+      /** @type {Date} */ expiration,
+      /** @type {number} */ i = 0,
+      /** @type {number} */ length,
+      /** @type {string} */ name = main.messages.cannedIndicesCookieName;
+  rawCannedIndices = main.$.load(name);
+  cannedIndices = rawCannedIndices? rawCannedIndices.split(","): [];
   /*jslint plusplus: true*/
   for (length = cannedIndices.length; i < length; i++)
   {
@@ -2334,24 +2676,39 @@ main.messages.saveCannedMessageOrder =
    }
   }
   cannedIndices.unshift(index);
-  cannedIndices = cannedIndices.join(",");
+  rawCannedIndices = cannedIndices.join(",");
   expiration = new Date();
   expiration.setFullYear(expiration.getFullYear() + 1);
-  main.$.save(name, cannedIndices, expiration);
+  main.$.save(name, rawCannedIndices, expiration);
 };
 main.messages.sendManually =
  function ()
  {
   main.form.submit();
  };
+/** @returns {?boolean|undefined} */
 main.messages.send =
  function ()
  {
-  var message = main.messageField.value, parameters, requestTimeout,
-      indicateUndeliveredMessage, uniqueID, notify, request, retry = 0,
-      resetTimer, resend, cleanup, sendMessage, stopRequest, translatedMessage,
-      prepareMessage, showConfirmationBox, messageKey,
-      /*translateDecision, */undeliveredTimeout;
+  var /** @type {string} */ message = main.messageField.value,
+      /** @type {string} */ parameters,
+      /** @type {number} */ requestTimeout,
+      /** @type {function():undefined} */ indicateUndeliveredMessage,
+      /** @type {string} */ uniqueID,
+      /** @type {string} */ notify,
+      /** @type {XMLHttpRequest} */ request,
+      /** @type {number} */retry = 0,
+      /** @type {function():undefined} */ resetTimer,
+      /** @type {function(boolean=):undefined} */ resend,
+      /** @type {function():undefined} */ cleanup,
+      /** @type {function():undefined} */ sendMessage,
+      /** @type {function():undefined} */ stopRequest,
+      /** @type {string} */ translatedMessage,
+      /** @type {function():undefined} */ prepareMessage,
+      /** @type {function():undefined} */ showConfirmationBox,
+      /** @type {string} */ messageKey,
+      /*translateDecision, */
+      /** @type {?number} */ undeliveredTimeout;
   cleanup =
    function ()
    {
@@ -2398,22 +2755,30 @@ main.messages.send =
   indicateUndeliveredMessage =
    function ()
    {
-    var header, receptor = main.messages.receptor, element,
+    var /** @type {Element} */ header,
+        /** @type {Element} */ receptor = main.messages.receptor,
+        /** @type {Element} */ element,
+        /** @type {Element} */
         container = main.$.createElement("div", "system-message message");
+
         container.id = uniqueID;
-        container.originalMessage = message;
-        container.notify = !!notify;
-        header = container.appendChild(
-         main.$.createElement(
-          "span", null,
-          "The following message might have not been delievered ("));
+        container["originalMessage"] = message;
+        container["notify"] = !!notify;
+        header =
+         /** @type {Element} */
+         (container.appendChild(
+          main.$.createElement(
+           "span", null,
+           "The following message might have not been delievered (")));
         element =
-         header.appendChild(main.$.createElement("a", null, "dismiss"));
+         /** @type {Element} */
+         (header.appendChild(main.$.createElement("a", null, "dismiss")));
         element.setAttribute("data-action", "remove-undelivered");
         element.href = "#";
         header.appendChild(main.$.createText(" or "));
         element =
-         header.appendChild(main.$.createElement("a", null, "resend"));
+         /** @type {Element} */
+         (header.appendChild(main.$.createElement("a", null, "resend")));
         element.setAttribute("data-action", "resend-undelivered");
         element.href = "#";
         header.appendChild(main.$.createText(") - "));
@@ -2453,7 +2818,7 @@ main.messages.send =
     request.onreadystatechange =
      function ()
      {
-      var key;
+      var /** @type {string} */ key;
       if (!undeliveredTimeout)
       {
        return;
@@ -2463,7 +2828,10 @@ main.messages.send =
        return;
       }
       /*jslint sub: true*/
-      key = main.$.parseJSON(request.responseText)["key"];
+      key =
+       /** @type {string} */
+       (/** @type {Object} */
+        (main.$.parseJSON(request.responseText))["key"]);
       /*jslint sub: false*/
       if ((request && request.status !== 200) || !key)
       {
@@ -2521,9 +2889,10 @@ main.messages.send =
      main.messages.sendMessageCallbacks[uniqueID] =
       function ()
       {
-       var undeliveredMessageElement;
+       var /** @type {Element} */ undeliveredMessageElement;
        resetTimer();
-       undeliveredTimeout = clearTimeout(undeliveredTimeout);
+       clearTimeout(undeliveredTimeout);
+       undeliveredTimeout = null;
 
        delete main.messages.sendMessageCallbacks[uniqueID];
        delete main.messages.sendMessageCallbacks[messageKey];
@@ -2545,8 +2914,11 @@ main.messages.send =
   showConfirmationBox =
    function ()
    {
-    var defaultButton, button, element, focus,
-        activeElement = main.doc.activeElement;
+    var /** @type {HTMLButtonElement} */ defaultButton,
+        /** @type {HTMLButtonElement} */ button,
+        /** @type {Element} */ element,
+        /** @type {function():undefined} */ focus,
+        /** @type {Element} */ activeElement = main.doc.activeElement;
     focus =
      function ()
      {
@@ -2570,7 +2942,10 @@ main.messages.send =
      element.appendChild(main.$.createText(translatedMessage));
      element.appendChild(main.$.createElement("br"));
     defaultButton =
-     element.appendChild(main.$.createElement("button", null, "Fix & Send"));
+     /** @type {HTMLButtonElement} */
+     (element.appendChild(
+      /** @type {HTMLButtonElement} */
+      (main.$.createElement("button", null, "Fix & Send"))));
     defaultButton.onclick =
      function ()
      {
@@ -2580,7 +2955,10 @@ main.messages.send =
       focus();
      };
     button =
-     element.appendChild(main.$.createElement("button", null, "Just Send"));
+     /** @type {HTMLButtonElement} */
+     (element.appendChild(
+      /** @type {HTMLButtonElement} */
+      (main.$.createElement("button", null, "Just Send"))));
     button.onclick =
      function ()
      {
@@ -2590,7 +2968,10 @@ main.messages.send =
       focus();
      };
     button =
-     element.appendChild(main.$.createElement("button", null, "Cancel"));
+     /** @type {HTMLButtonElement} */
+     (element.appendChild(
+      /** @type {HTMLButtonElement} */
+      (main.$.createElement("button", null, "Cancel"))));
     button.onclick =
      function ()
      {
@@ -2639,18 +3020,25 @@ main.messages.send =
 main.messages.useCannedMessage =
  function ()
  {
-  var cannedMessage, cannedMessageField = main.cannedMessageField,
+  var /** @type {HTMLOptionElement} */
+      cannedMessage,
+      /** @type {HTMLSelectElement} */
+      cannedMessageField = main.cannedMessageField,
+      /** @type {HTMLTextAreaElement} */
       message = main.messageField,
+      /** @type {number} */
       cannedMessageIndex = cannedMessageField.selectedIndex;
+
   if (cannedMessageIndex === 0)
   {
    return;
   }
-  cannedMessage = cannedMessageField.options[cannedMessageIndex];
+  cannedMessage =
+   /** @type {HTMLOptionElement} */ (cannedMessageField.options[cannedMessageIndex]);
   message.value =
    cannedMessage.value + (message.value? " - " + message.value: "");
   main.messages.saveCannedMessageOrder(
-   cannedMessage.getAttribute("data-index"));
+   parseInt(cannedMessage.getAttribute("data-index"), 10));
   cannedMessageField.selectedIndex = 0;
   main.messages.send();
  };
@@ -2661,26 +3049,32 @@ main.messages.startCheckerTimer =
   main.messages.checkerTimer =
    setInterval(main.updatePresenceData, main.pingInterval);
  };
-/** @this {Element} */
+/** @this {Element}
+    @param {Event|MouseEvent} e */
 main.messages.removeMessage =
  function (e)
  {
-  var element, messageContainer, request, url;
+  var /** @type {Element} */ element,
+      /** @type {Element} */ messageContainer,
+      /** @type {XMLHttpRequest} */ request,
+      /** @type {string} */ url;
   function showError()
   {
    element.removeAttribute("data-state");
    main.showDialog(
     "The message could not be deleted. :( Try again soon, though!");
   }
+  /** @param {string} name
+      @returns {string} */
   function get(name)
   {
-   return main.$.encode(messageContainer.getAttribute("data-" + name));
+   return main.$.encode(messageContainer.getAttribute("data-" + name)) || "";
   }
 
   main.$.preventDefault(e);
 
   element = this;
-  messageContainer = element.parentNode.parentNode;
+  messageContainer = /** @type {Element} */ (element.parentNode.parentNode);
 
   if (element.getAttribute("data-state") === "in-progress")
   {
@@ -2716,7 +3110,8 @@ main.messages.removeMessage =
 main.messages.fetch =
  function (e, queued)
  {
-  var request, url;
+  var /** @type {XMLHttpRequest} */ request,
+      /** @type {string} */ url;
   if (e)
   {
    main.$.preventDefault(e);
@@ -2736,7 +3131,7 @@ main.messages.fetch =
    url += "&test=1";
   }
   request.open("get", url, true);
-  request.send({});
+  request.send(null);
   setTimeout(
    function ()
    {
@@ -2767,16 +3162,21 @@ main.messages.addOldMessages =
 main.messages.addMultipleMessages =
  function (messageList, old)
  {
-  var i = 0, length;
+  var /** @type {number} */ i = 0,
+      /** @type {number} */ length,
+      /** @type {Object<string, ?>} */ message;
   /*jslint plusplus: true*/
   for (length = messageList.length; i < length; i++)
   {
   /*jslint plusplus: false*/
   /*jslint sub: true*/
+   message = /** @type {Object<string, ?>} */ (messageList[i]);
    main.messages.addMessage(
-    messageList[i]["value"], messageList[i]["key"],
-    messageList[i]["accurate-timestamp"],
-    messageList[i]["accurate-timestamp-date"], null, old, i !== length - 1);
+    /** @type {Object<string, string>} */ (message["value"]),
+    /** @type {string} */ (message["key"]),
+    /** @type {string} */ (message["accurate-timestamp"]),
+    /** @type {string} */ (message["accurate-timestamp-date"]),
+    null, old, i !== length - 1);
   /*jslint sub: false*/
   }
  };
@@ -2784,7 +3184,7 @@ main.messages.addMultipleMessages =
 main.messages.addQueuedMessages =
  function (messageList)
  {
-  var i;
+  var /** @type {number} */ i;
   main.settings.offline = false;
   main.updateBodyIndicator();
   //main.messages.offlineReceptor.innerHTML = "";
@@ -2814,6 +3214,8 @@ main.messages.addQueuedMessages =
  };
 /** @param {Object.<string, string>} messageData
     @param {string} key
+    @param {string} accurateTimestamp
+    @param {string} accurateTimestampDate
     @param {?string=} uniqueID
     @param {boolean=} old
     @param {boolean=} doNotNotify */
@@ -2823,17 +3225,49 @@ main.messages.addMessage =
   old, doNotNotify)
  {
   /*jslint sub: true*/
-  var deleteLink, content = messageData["content"], form = main.form,
-      headers, message = main.doc.createElement("div"),
-      received = true, sender = messageData["sender"],
+  var /** @type {Element} */
+      headers,
+      /** @type {Element} */
+      messageContent,
+      /** @type {HTMLAnchorElement} */ 
+      deleteLink,
+      /** @type {string} */
+      content = messageData["content"],
+      /** @type {HTMLFormElement} */
+      form = main.form,
+      /** @type {Element} */
+      message = main.doc.createElement("div"),
+      /** @type {string} */
+      sender = messageData["sender"],
+      /** @type {string} */
       originalTimestamp = messageData["timestamp"],
+      /** @type {boolean} */
+      received = true,
+      /** @type {Date} */
       timestamp = new Date(originalTimestamp),
+      /** @type {string} */
       timestampString =
        timestamp.getFullYear() + "-" + (timestamp.getMonth() + 1)+ "-" +
        timestamp.getDate() + " " + timestamp.toLocaleTimeString(),
-      messageContent, receptor = main.messages.receptor;
+      /** @type {Element} */
+      receptor = main.messages.receptor;
   /*jslint sub: false*/
 
+  function changeLastMessageTimestamp()
+  {
+   if (old || main.settings.offline)
+   {
+    return;
+   }
+
+   // Setting the last message timestamp.
+   main.lastMessageTimestamp = accurateTimestamp;
+   main.lastMessageTimestampDate =
+    main.$.parseDateString(accurateTimestampDate);
+  }
+
+
+  // Accept the message as a received message.
   if (key && main.messages.sendMessageCallbacks[key])
   {
    main.messages.sendMessageCallbacks[key]();
@@ -2842,6 +3276,24 @@ main.messages.addMessage =
   {
    main.messages.sendMessageCallbacks[uniqueID]();
   }
+
+  // Ignoring messages sent from the user
+  // to other people in other conversations.
+  if (sender === main.userName &&
+      /** @type {string} */ (messageData["recipient"]) !== main.recipient)
+  {
+   changeLastMessageTimestamp();
+   return;
+  }
+
+  // Ignoring messages sent from other recipients (but notifying the user).
+  if (sender !== main.userName && sender !== main.recipient)
+  {
+   main.messages.showOtherConversationNotification(sender);
+   changeLastMessageTimestamp();
+   return;
+  }
+
   received = main.userName !== sender;
   if (sender === main.recipient)
   {
@@ -2856,16 +3308,19 @@ main.messages.addMessage =
   /*jslint sub: false*/
 
   headers =
-   message.appendChild(
-    main.$.createElement(
-     "div", "message-headers",
-     "From " + sender + " (" + timestampString + ")"));
+   /** @type {Element} */
+   (message.appendChild(
+     main.$.createElement(
+      "div", "message-headers",
+      "From " + sender + " (" + timestampString + ")")));
   /*jslint sub: true*/
-  if (form["manage"].value === "1")
+  if (/** @type {HTMLInputElement} */ (form["manage"]).value === "1")
   {
   /*jslint sub: false*/
    headers.appendChild(main.$.createText(" ("));
-   deleteLink = main.$.createElement("a", null, "delete");
+   deleteLink =
+    /** @type {HTMLAnchorElement} */
+    (main.$.createElement("a", null, "delete"));
    deleteLink.href = "#";
    deleteLink.setAttribute("data-action", "remove");
    headers.appendChild(deleteLink);
@@ -2873,14 +3328,15 @@ main.messages.addMessage =
   }
 
   messageContent =
-   message.appendChild(
-    main.$.createElement("div", null));
+   /** @type {Element} */
+   (message.appendChild(main.$.createElement("div", null)));
   if (main.$.isRTL(content))
   {
    messageContent.dir = "rtl";
   }
   messageContent.innerHTML = content;
   main.$.linkifyURLs(messageContent);
+
   // This is a previous message.
   if (old)
   {
@@ -2894,13 +3350,11 @@ main.messages.addMessage =
    //receptor = main.messages.offlineReceptor;
   //}
   // Normal message.
-  else if (!main.settings.offline)
-  {
-   // Setting the last message timestamp.
-   main.lastMessageTimestamp = accurateTimestamp;
-   main.lastMessageTimestampDate =
-    main.$.parseDateString(accurateTimestampDate);
-  }
+  // else
+  // {
+  changeLastMessageTimestamp();
+  // }
+
   // The receptor was not reset.
   if (receptor)
   {
@@ -2920,15 +3374,19 @@ main.messages.addMessage =
    }
   }
  };
+/** @param {function(Element)} runAction */
 main.messages.iterateThroughMessages =
  function (runAction)
  {
-  var elements, i, length;
+  var /** @type {NodeList} */ elements,
+      /** @type {number} */ i,
+      /** @type {number} */ length;
   if (main.messages.messagePane.querySelectorAll)
   {
    elements = main.messages.messagePane.querySelectorAll(".message");
+   length = elements.length;
    /*jslint plusplus: true*/
-   for (i = 0, length = elements.length; i < length; i++)
+   for (i = 0; i < length; i++)
    {
    /*jslint plusplus: false*/
     runAction(elements[i]);
@@ -2937,11 +3395,12 @@ main.messages.iterateThroughMessages =
   else
   {
    elements = main.$.tag("div", main.messages.messagePane);
+   length = elements.length;
    /*jslint plusplus: true*/
-   for (i = 0, length = elements.length; i < length; i++)
+   for (i = 0; i < length; i++)
    {
    /*jslint plusplus: false*/
-    if (elements[i].className === "message")
+    if (/** @type {Element} */ (elements[i]).className === "message")
     {
      runAction(elements[i]);
     }
@@ -2953,10 +3412,13 @@ main.messages.iterateThroughMessages =
 main.messages.findMessageByKey =
  function (key)
  {
-  var messages, i, length;
+  var /** @type {NodeList} */ messages,
+      /** @type {number} */ i,
+      /** @type {number} */ length;
   if (main.messages.messagePane.querySelector)
   {
-   return main.messages.messagePane.querySelector("[data-key=\"" + key + "\"]");
+   return main
+           .messages.messagePane.querySelector("[data-key=\"" + key + "\"]");
   }
   messages = main.$.tag("div", main.messages.messagePane);
   length = messages.length;
@@ -2964,22 +3426,116 @@ main.messages.findMessageByKey =
   for (i = 0; i < length; i++)
   {
   /*jslint plusplus: false*/
-   if (messages[i].getAttribute("data-key") === key)
+   if (/** @type {Element} */ (messages[i]).getAttribute("data-key") === key)
    {
     return messages[i];
    }
   }
   return null;
  };
+/** @param {string} key */
 main.messages.removeMessageElement =
  function (key)
  {
-  var message = main.messages.findMessageByKey(key);
+  var /** @type {Element} */ message = main.messages.findMessageByKey(key);
   if (message)
   {
    message.parentNode.removeChild(message);
   }
  };
+/** @param {string} sender */
+main.messages.showOtherConversationNotification =
+ function (sender)
+ {
+  main.otherConversationDetails.push(sender);
+  main.eOtherConversations.innerHTML =
+   main.otherConversationDetails.length + " other message" +
+   (main.otherConversationDetails.length > 1? "s": "");
+  main.otherConversations = true;
+  main.updateBodyIndicator();
+ };
+/** @param {Event} e */
+main.messages.showOtherConversationDialog =
+ function (e)
+ {
+  var /** @type {string} */
+      url = main.eOtherConversations.getAttribute("data-url"),
+      /** @type {Array<string>} */
+      details = main.otherConversationDetails,
+      /** @type {Array<string>} */
+      conversationLinks = [],
+      /** @type {Object<string, boolean>} */
+      nameMap = {},
+      /** @type {string} */
+      name,
+      /** @type {number} */
+      i = 0,
+      /** @type {number} */
+      length;
+
+  main.$.preventDefault(e);
+
+  for (length = details.length; i < length; i++)
+  {
+   name = details[i];
+   if (!nameMap[name])
+   {
+    conversationLinks.push(
+     "<a href=\"" + url.replace("$name$", name) + "\" data-keep=\"1\" " +
+     "target=\"_blank\">" + name + "</a>");
+    nameMap[name] = true;
+   }
+  }
+
+  main.otherConversations = false;
+  main.updateBodyIndicator();
+
+  main.showDialog(
+   "You received messages from other people. " +
+   "Click on name to open your conversation.<br/>" +
+   conversationLinks.join("<br/>"),
+   true);
+ };
+/** @param {string} messageTimestampString */
+main.messages.reportDelays =
+ function (messageTimestampString)
+ {
+  var /** @type {Date} */
+      messageTimestamp,
+      /** @type {number} */
+      relativeTimeDrift,
+      /** @type {number} */
+      serverTime = main.timeSynchronization.serverTime,
+      /** @type {string} */
+      delay;
+
+      //* @type {number} */
+      //relativeTimeFromSubmission =
+       //main.$.parseDateString(messageTimestamp) -
+       //main.timeSynchronization.serverTime;
+
+  if (!serverTime)
+  {
+   return;
+  }
+
+  messageTimestamp = main.$.parseDateString(messageTimestampString);
+  relativeTimeDrift = serverTime - main.timeSynchronization.localTime;
+
+  delay =
+   String(
+    Math.abs(messageTimestamp - ((new Date().getTime()) + relativeTimeDrift)));
+
+  //console.log(
+   //messageTimestamp, serverTime, main.timeSynchronization.localTime,
+   //relativeTimeDrift, delay);
+
+  if (delay > 10000)
+  {
+   main.sendReport("delayed-message", delay);
+  }
+ };
+/** @param {string} action */
 main.processDesktopCall =
  function (action)
  {
