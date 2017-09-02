@@ -45,7 +45,7 @@ CUSTOM_USER_LIST = None
 MIT. Enjoy.
 ### Resources
 Creative Commons 0. Enjoy.
-### MP3 Player -
+### MP3 Player
 ```
 Copyright (c) 2009 jwplayer.com
 
