@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+# Daylight saving times of Israel
 def timestamp_hour_delta(timestamp):
  if (timestamp > datetime(day = 5, month = 10, year = 2008, hour = 1, minute = 59, second = 59) and \
      timestamp < datetime(day = 27, month = 3, year = 2009, hour = 1, minute = 59, second = 59)) or \

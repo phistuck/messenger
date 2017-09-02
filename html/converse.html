@@ -1,19 +1,31 @@
 <!doctype html>
 <html data-channel-name="{{ channel_name }}" data-user-name="{{ user }}"
-      data-at-work="{{ work }}" data-recipient="{{ to }}"
-      data-last-message-timestamp="{{ last_message_timestamp }}"
+      data-recipient="{{ to }}"{% if desktop_mode %} data-desktop="1"
+      {% endif %}data-last-message-timestamp="{{ last_message_timestamp }}"
       data-first-message-timestamp="{{ first_message_timestamp }}"
-      data-new-messages-mode="{% if new_messages_mode %}1{% endif %}"
-      data-desktop="{{ desktop }}"{% if normal %} data-normal="1"{% endif %}
-      data-version="{{ application_version }}" dir="ltr">
+      {% if new_messages_mode %}data-new-messages-mode="1"
+      {% endif %}{% if normal %}data-normal="1"
+      {% endif %}data-version="{{ application_version }}"
+      data-reclaim-token-url="{{ reclaim_token_url }}"
+      data-notification-url="{{ notification_url }}"
+      data-remove-message-url="{{ remove_message_url }}"
+      data-fetch-more-messages-url="{{ fetch_more_messages_url }}"
+      data-get-time-url="{{ get_time_url }}"
+      data-update-presence-data-url="{{ update_presence_data_url }}"
+      data-report-url="{{ report_url }}"
+      data-sign-out-url="{{ sign_out_url }}"
+      data-notification-mp3-url="{{ notification_mp3_url }}"
+      data-new-message-icon-url="{{ new_message_icon_url }}"{% if not normal %}
+      data-favicon-url="{{ favicon_url }}"{% endif %}
+      data-dir="ltr">
  <head>
   <meta http-equiv="X-UA-Compatible" content="IE=edge; chrome=1"/>
-  <title>{% if dev_mode %}Dev{% endif %}{% if normal %}Messenger{% else %}Blank{% endif %}</title>
+  <title>{{ title }}</title>
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1,
                  minimum-scale=1, user-scalable=0"/>
-  <link href="css/converse.css" rel="stylesheet" type="text/css"/>
-  {% if normal %}<link rel="favorite icon" href="/images/favicon.png" id="favicon"/>{% endif %}
+  <link href="css/converse.css" rel="stylesheet" type="text/css"/>{% if normal %}
+  <link rel="favorite icon" href="{{ favicon_url }}" id="favicon"/>{% endif %}
  </head>
  <body class="{% if windows %}start-up {% endif %}offline-mode{% if new_messages_mode %} new-messages{% endif %}">
   <div class="intro"></div>
@@ -21,8 +33,9 @@
   <div class="fetch-more-messages"><a data-action="fetch-more-messages"
        href="#fetch-more-messages">Show more messages</a></div>
   <div id="presence-data">
-   {% if desktop_mode %}{% if dev_mode %}<!--<a data-action="exit-application" href="#">X</a>-->{% endif %}{% endif %}{% if not normal %}<a
-      href="/sign-out"><img border="0"
+   {% if desktop_mode %}{% if dev_mode %}
+      <!--<a data-action="exit-application" href="#">X</a>-->
+   {% endif %}{% endif %}{% if not normal %}<a href="{{ sign_out_url }}"><img border="0"
       src="images/sign-out.png" width="15" height="15" alt="Sign Out"/></a>{% endif %}<a
       data-action="settings" href="#settings"><img data-action="settings"
       src="images/settings.png" width="15" border="0"
@@ -36,7 +49,7 @@
       alt="Re-enable sound/desktop notifications"/></a>
    <span id="connection-state" class="connection-state">Connecting...</span>
    <a id="other-conversations" data-action="show-other-conversations"
-      href="#" data-url="/converse?from={{ user }}&to=$name${% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}{% if test %}&test=1{% endif %}"></a>
+      href="#" data-url="{{ converse_url }}?from={{ user }}&to=$name${% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}{% if test %}&test=1{% endif %}"></a>
    <span id="presence-state" class="offline"></span>
    {{ to }}
    <span id="presence-location" class="location"></span>
@@ -64,7 +77,7 @@
      <input type="range" name="sound-notification-volume"
             value="0.99" step="0.01" min="0" max="1"/></small>
     <div>
-     <a target="_blank" href="/static-form?from={{ user }}&to={{ to }}">
+     <a target="_blank" href="{{ static_form_url }}?from={{ user }}&to={{ to }}">
       Download a static message sending form
      </a>
     </div>
@@ -77,14 +90,14 @@
       Enable native desktop notifications</label>
     </div>
     <div>
-     <a href="/converse?from={{ user }}&to={{ to }}&test={{ test }}&manage=1{% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}">
+     <a href="{{ converse_url }}?from={{ user }}&to={{ to }}&test={{ test }}&manage=1{% if normal %}&normal=1{% endif %}{% if development %}&dev=1{% endif %}">
       Let me delete messages
      </a>
     </div>
    </form>
   </div>
   <div id="outro" class="outro"></div><form name="messaging-form"
-       class="messaging-form" action="/send-message" method="post">
+       class="messaging-form" action="{{ send_message_url }}" method="post">
    <input type="hidden" name="test" value="{{ test }}"/>
    <input type="hidden" name="manage" value="{{ manage }}"/>
    <input type="hidden" name="from" value="{{ user }}"/>
@@ -92,8 +105,8 @@
    <div class="message-field-wrapper"><input type="submit" tabindex="2"
         value="Post"/><button id="thinking" tabindex="5"
         title="Thinking mode (F8)"><img width="15" height="15"
-        src="/images/thinking.png"/></button><textarea
-        name="content" autocomplete="off" autofocus="autofocus" tabindex="1"
+        alt="Thinking mode" src="/images/thinking.png"/></button><textarea
+        name="content" autofocus="autofocus" tabindex="1"
         placeholder="Enter your message..."></textarea></div>
    <div class="canned-message-post-wrapper"><select tabindex="4"
         name="canned-message">
@@ -106,6 +119,14 @@
    </div>
   </form>
   <script type="text/javascript" src="/_ah/channel/jsapi"></script>
-  <script type="text/javascript" src="scripts/converse.{% if development %}{% else %}min.{% endif %}js?{{ application_version }}"></script>
+  <script type="text/javascript" src="{{ converse_script_url }}"></script>{% if dev_mode %}
+  <script>
+if (typeof mainAPI === "undefined")
+{
+ console.log("build_scripts/prepare-to-upload.py must be run first.");
+ console.log("During development, you can add &dev=1 or ?dev=1 to the URL instead.");
+}
+  </script>
+  {% endif %}
  </body>
 </html>

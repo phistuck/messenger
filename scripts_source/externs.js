@@ -40,9 +40,9 @@ goog.appengine.Channel.prototype.open = function (obj) {};
 /** @type {NotificationCenter} */
 var webkitNotifications = Window.prototype.webkitNotifications;
 
-/** @param {function()|function({timeRemaining:function():number, didTimeout: boolean})} task
-    @param {{timeout: number}=} options */
-window.requestIdleCallback = function (task, options) {};
+// /** @param {function()|function({timeRemaining:function():number, didTimeout: boolean})} task
+//    @param {{timeout: number}=} options */
+// window.requestIdleCallback = function (task, options) {};
 
 /** @param {function()} task */
 window.setImmediate = function (task) {};

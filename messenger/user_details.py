@@ -1,37 +1,8 @@
-user_list = \
- [
-  {
-   "internal-name": "foo",
-   "real-name": "Foo",
-   "nickname": "First",
-   "email": "foo@gmail.com",
-   "email-for-logs": "foolog@gmail.com",
-   "default-recipient": "baz",
-   "accepted-xmpp-invitation": True
-  },
-  {
-   "internal-name": "baz",
-   "real-name": "Baz",
-   "nickname": "Second",
-   "email": "baz@gmail.com",
-   "email-for-logs": "bazlog@gmail.com",
-   "default-recipient": "foo",
-   "accepted-xmpp-invitation": True
-  },
-  {
-   "internal-name": "bat",
-   "real-name": "Bat",
-   "nickname": "Third",
-   "email": "bat@gmail.com",
-   "email-for-logs": "batlog@gmail.com",
-   "default-recipient": "foo",
-   "accepted-xmpp-invitation": False
-  }
- ]
+from constants import USER_LIST
 
 users = {}
 
-for user in user_list:
+for user in USER_LIST:
  users[user["email"]] = users[user["internal-name"]] = user
 
 def is_android_or_windows(headers):

@@ -1,18 +1,12 @@
 application: messenger
 
-version: 0-0-1-15
+version: 0-0-1-16
 runtime: python27
 api_version: 1
 threadsafe: true
 default_expiration: 365d
 
 handlers:
-- url: /
-  static_files: resources/homepage.html
-  upload: resources/homepage\.html
-  mime_type: text/html
-  http_headers:
-   Vary: Accept-Encoding
 - url: /robots.txt
   static_files: resources/robots.txt
   upload: resources/robots\.txt
@@ -23,13 +17,6 @@ handlers:
   static_files: resources/crossdomain.xml
   upload: resources/crossdomain\.xml
   mime_type: text/html
-  http_headers:
-   Vary: Accept-Encoding
-- url: /redirect-to-converse
-  static_files: html/redirect-to-converse.html
-  upload: html/redirect-to-converse\.html
-  mime_type: text/html
-  expiration: 1d
   http_headers:
    Vary: Accept-Encoding
 - url: /notification
@@ -78,9 +65,9 @@ handlers:
   mime_type: application/x-shockwave-flash
   http_headers:
    Vary: Accept-Encoding
-- url: /scripts/converse\.js
-  static_files: scripts/converse.js
-  upload: scripts/converse\.js
+- url: /scripts_source/converse\.js
+  static_files: scripts_source/converse.js
+  upload: scripts_source/converse\.js
   mime_type: text/javascript
   http_headers:
    Vary: Accept-Encoding
@@ -188,3 +175,14 @@ inbound_services:
 builtins:
 - deferred: on
 - remote_api: on
+
+skip_files:
+- ^(.*/)?#.*#$
+- ^(.*/)?.*~$
+- ^(.*/)?.*\.py[co]$
+- ^(.*/)?.*/RCS/.*$
+- ^(.*/)?\..*$
+- build_scripts/compiler.jar
+- build_scripts/generated
+- LICENSE
+- resources/player.license

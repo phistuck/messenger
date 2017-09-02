@@ -1,7 +1,8 @@
 <!doctype html>
 <html>
  <head>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge; chrome=1"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge; chrome=1"/>{% if favicon_url %}
+  <link rel="favorite icon" href="{{ favicon_url }}"/>{% endif %}
   <title>Login</title>
   <style>
    .desktop H1 { display: none; }
@@ -34,50 +35,115 @@
   <script>
    /*jslint sloppy: true, white: true, browser: true*/
    /*global escape, unescape*/
+   /*eslint-disable no-extra-parens*/
    var form,
-       desktop = document.location.href.indexOf("desktop=1") !== -1? "&desktop=1": "",
-       dev = document.location.href.indexOf("dev=1") !== -1? "&dev=1": "";
+       desktop = "{% if desktop %}desktop=1{% endif %}",
+       dev = "{% if dev %}&dev=1{% endif %}";
+
+   function createRequest()
+   {
+    var /** @type {function(new:XMLHttpRequest)} */
+        HTTPRequest = window.XMLHttpRequest,
+        /** @type {function(new:XMLHttpRequest, string, string=)} */
+        ActiveX;
+
+    if (HTTPRequest)
+    {
+     return new HTTPRequest();
+    }
+    ActiveX =
+     /** @type {function(new:XMLHttpRequest, string, string=)} */
+     (window.ActiveXObject);
+
+    if (ActiveX)
+    {
+     try
+     {
+      return new ActiveX("Msxml2.XMLHTTP.6.0");
+     }
+     catch (e1)
+     {
+      try
+      {
+       return new ActiveX("Msxml2.XMLHTTP.3.0");
+      }
+      catch (e2)
+      {
+       try
+       {
+        return new ActiveX("Msxml2.XMLHTTP");
+       }
+       catch (e3)
+       {
+        try
+        {
+         return new ActiveX("Microsoft.XMLHTTP");
+        }
+        catch (e4)
+        {
+        }
+       }
+      }
+     }
+    }
+    alert("You have a weirdly old browser. Sorry, bye.");
+    throw new Error("The browser is missing an HTTP request sending method.");
+   }
+
    if (desktop)
    {
     document.documentElement.className += " desktop";
    }
+   function handleUserSettings(optionalEvent)
+   {
+   	var e = optionalEvent, request, data, user, recipient;
+   	if (!e)
+   	{
+     e = window.event;
+   	}
+   	
+   	request = e.target;
+   	
+   	if (request.readyState !== 4)
+   	{
+     return;
+   	}
+   	if (request.status !== 200)
+   	{
+   	 form.className = "error-mode";
+   	 return;
+   	}
+
+   	data = ((window.JSON && JSON.parse) || eval)(request.responseText);
+    user = data["internal-name"];
+    recipient = data["default-recipient"];
+   	
+    form.className = "success-mode";
+	form.from.blur();
+	if (window.localStorage)
+	{
+	 localStorage.user = user;
+	}
+	else
+	{
+	 document.cookie = "user=" + escape(user) + "; path=/; max-age=" + 3e7 + ";";
+	}
+	document.location.href = "{{ converse_url }}?from=" + user + "&to=" + recipient + desktop + dev;
+   }
    function login(user)
    {
-    var recipient;
-    if (user === "foo")
-    {
-     recipient = "baz";
-    }
-    else if (user === "baz" || user === "Baz")
-    {
-     user = "baz";
-     recipient = "foo";
-    }
-    if (!recipient)
-    {
-     form.className = "error-mode";
-    }
-    else
-    {
-     form.className = "success-mode";
-     form.from.blur();
-     if (window.localStorage)
-     {
-      localStorage.user = user;
-     }
-     else
-     {
-      document.cookie = "user=" + escape(user) + "; path=/; max-age=" + 3e7 + ";";
-     }
-     document.location.href = "/converse?from=" + user + "&to=" + recipient + desktop + dev;
-    }
+    var request = createRequest();
+    request.open(
+     "POST", "/get-user-settings?user=" + encodeURIComponent(user), true);
+    request.onreadystatechange = handleUserSettings;
+    request.send(null);
     return false;
    }
    function tryAutomaticLogin()
    {
     try
     {
-     var cookie, cookies, user, i, length;
+     var cookie, cookies, user, i, cookieCount;
      if (window.localStorage && localStorage.user)
      {
       user = localStorage.user;
@@ -86,7 +152,7 @@
      {
       cookies = document.cookie.split(/\s*;\s*/g);
       /*jslint plusplus: true*/
-      for (i = 0, length = cookies.length; i < length; i++)
+      for (i = 0, cookieCount = cookies.length; i < cookieCount; i++)
       {
       /*jslint plusplus: false*/
        cookie = cookies[i].split("&");
@@ -121,8 +187,9 @@
       form.from.focus();
      }
      form.from.onkeypress =
-      function (e)
+      function (optionalEvent)
       {
+       var e = optionalEvent;
        if (!e)
        {
         e = window.event;
@@ -153,7 +220,7 @@
       {
        if (action === "focus")
        {
-        if (form.className == "form-mode")
+        if (form.className === "form-mode")
         {
          form.from.focus();
         }

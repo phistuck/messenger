@@ -25,7 +25,9 @@ def is_authenticated(self, DEV_MODE):
   # headerss += header + " - " + request_headers[header] + "\n"
   #logging.info("No authorization... " + headerss + "\n" + request.body)
   
- #el
+ # In order to authenticate in the fake mode,
+ # use the very secretive username "s" and no password
+ # When asked again, use the very secretive username "u" and no password.
  if "Authorization" in request_headers:
   if has_session(request) and request_headers["Authorization"] == "Basic dTo=":
    return True

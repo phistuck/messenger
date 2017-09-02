@@ -1,6 +1,8 @@
 /*jslint sloppy: true, browser: true, white: true,
          maxerr: 999, maxlen: 80, indent: 1, devel: true*/
 /*global main, webkitNotifications, escape, unescape, goog, Notification */
+/*eslint-env browser */
+/*eslint-disable no-extra-parens */
 /** @define {boolean} */
 var MAIN_DEBUG = true;
 
@@ -35,10 +37,12 @@ if (!main.$)
 
 /** @type {undefined} */
 main.$.notDefined = void 0;
+/** @const {string} */
+main.urlEncodedMimeType = "application/x-www-form-urlencoded";
 /** @type {RegExp} */
 main.$.letterPattern = null;
 /** @type {RegExp} */
-main.$.whitespacePatten = null;
+main.$.whitespacePattern = null;
 /** @type {RegExp} */
 main.$.urlPattern =
  new RegExp("((ftp|https|http)://|www\\.[א-תa-zA-Z])[^ \\n\\r'\"]+", "gi");
@@ -101,30 +105,30 @@ main.$.firstTag =
   return (main.$.tag(tagName, elementOrDocument) || [null])[0];
  };
 /** @param {string} text
-    @param {Document=} document
+    @param {Document=} documentNode
     @returns {Text} */
 main.$.createText =
- function (text, document)
+ function (text, documentNode)
  {
-  return (document || main.doc).createTextNode(text);
+  return (documentNode || main.doc).createTextNode(text);
  };
-/** @param {string} name
+/** @param {string} elementName
     @param {?string=} className
     @param {?string=} text
-    @param {Document=} document
+    @param {Document=} optionalDocumentNode
     @returns {Element} */
 main.$.createElement =
- function (name, className, text, document)
+ function (elementName, className, text, optionalDocumentNode)
  {
-  document = document || main.doc;
-  var element = document.createElement(name);
+  var documentNode = optionalDocumentNode || main.doc;
+  var element = documentNode.createElement(elementName);
   if (className)
   {
    element.className = className;
   }
   if (text)
   {
-   element.appendChild(main.$.createText(text, document));
+   element.appendChild(main.$.createText(text, documentNode));
   }
   return element;
  };
@@ -158,7 +162,8 @@ main.$.translateHebrewToEnglish =
       /** @type {string} */ character,
       /** @type {Array<string>} */ texts,
       /** @type {string} */ text,
-      /** @type {number} */ textItemCount;
+      /** @type {number} */ textItemCount,
+      /** @type {string} */ translatedText;
 
   /** @param {string} character */
   function reverseParentheses(character)
@@ -227,9 +232,9 @@ main.$.translateHebrewToEnglish =
    }
    text =
     text.replace(main.$.parenthesesPattern, reverseParentheses);
-   originalText = originalText.replace(texts[j], text);
+   translatedText = originalText.replace(texts[j], text);
   }
-  return originalText;
+  return translatedText;
  };
 /** @param {Element} element
     @param {function(Element):boolean} isValidElementFilter
@@ -238,12 +243,12 @@ main.$.findTextNodes =
  function (element, isValidElementFilter, runAction)
  {
   var /** @type {number} */ i,
-      /** @type {NodeList<Element>} */ children = element.childNodes,
-      /** @type {number} */ length = children.length,
-      /** @type {Node} */ currentNode,
-      /** @type {Element} */ currentElement;
+      /** @type {NodeList<Element>} */ children =
+       /** @type {NodeList<Element>} */ (element.childNodes),
+      /** @type {number} */ childCount = children.length,
+      /** @type {Node} */ currentNode;
   /*jslint plusplus: true*/
-  for (i = 0; i < length; i++)
+  for (i = 0; i < childCount; i++)
   {
    currentNode = /** @type {Node} */ (children[i]);
   /*jslint plusplus: true*/
@@ -262,12 +267,12 @@ main.$.findTextNodes =
    }
   }
  };
-/** @param {Element} element */
+/** @param {Element} eContent */
 main.$.linkifyURLs =
- function (element)
+ function (eContent)
  {
   main.$.findTextNodes(
-   element,
+   eContent,
    /** @param {Element} foundElement
        @returns {boolean} */
    function (foundElement)
@@ -280,7 +285,7 @@ main.$.linkifyURLs =
    {
     var /** @type {number} */ i,
         /** @type {Array<string>} */ urls,
-        /** @type {number} */ length,
+        /** @type {number} */ urlCount,
         /** @type {string} */ text,
         /** @type {string} */ html,
         /** @type {Element} */ element,
@@ -292,7 +297,7 @@ main.$.linkifyURLs =
     if (urls)
     {
      /*jslint plusplus: true*/
-     for (i = 0, length = urls.length; i < length; i++)
+     for (i = 0, urlCount = urls.length; i < urlCount; i++)
      {
       url = (urls[i].indexOf("www") === 0? "http://": "") + urls[i];
      /*jslint plusplus: false*/
@@ -319,13 +324,13 @@ main.$.createRequest =
  function ()
  {
   var /** @type {function(new:XMLHttpRequest)} */
-      Request = window.XMLHttpRequest,
+      HTTPRequest = window.XMLHttpRequest,
       /** @type {function(new:XMLHttpRequest, string, string=)} */
       ActiveX;
 
-  if (Request)
+  if (HTTPRequest)
   {
-   return new Request();
+   return new HTTPRequest();
   }
   ActiveX =
    /** @type {function(new:XMLHttpRequest, string, string=)} */
@@ -363,24 +368,24 @@ main.$.createRequest =
    }
   }
   alert("You have a weirdly old browser. Sorry, bye.");
-  throw "The browser is missing an HTTP request sending method.";
+  throw new Error("The browser is missing an HTTP request sending method.");
  };
-/** @param {string} name
+/** @param {string} cookieName
     @returns {?string|undefined} */
 main.$.getCookie =
- function (name)
+ function (cookieName)
  {
   var /** @type {Array<string>} */ cookie,
       /** @type {Array<string>} */
       cookies = main.doc.cookie.split(/[\s]*;[\s]*/g),
-      /** @type {number} */ i = 0,
-      /** @type {number} */ length;
+      /** @type {number} */ i,
+      /** @type {number} */ cookieCount = cookies.length;
   /*jslint plusplus: true*/
-  for (length = cookies.length; i < length; i++)
+  for (i = 0; i < cookieCount; i++)
   {
   /*jslint plusplus: false*/
    cookie = cookies[i].split("=");
-   if (main.$.decode(cookie[0]) === name)
+   if (main.$.decode(cookie[0]) === cookieName)
    {
     return main.$.decode(cookie[1]);
    }
@@ -401,51 +406,51 @@ main.$.encode =
  {
   return text? encodeURIComponent(text): null;
  };
-/** @param {string} name
+/** @param {string} cookieName
     @param {string|number|boolean} value
     @param {Date=} expiration */
 main.$.setCookie =
- function (name, value, expiration)
+ function (cookieName, value, expiration)
  {
   main.doc.cookie =
-   main.$.encode(name) + "=" + main.$.encode(String(value)) + "; " +
-   (expiration? "expires=" + expiration.toGMTString() + "; ": "") + "path=/";
+   main.$.encode(cookieName) + "=" + main.$.encode(String(value)) + "; " +
+   (expiration? "expires=" + expiration.toUTCString() + "; ": "") + "path=/";
  };
-/** @param {string} name
+/** @param {string} key
     @returns {?string|undefined} */
 main.$.load =
- function (name)
+ function (key)
  {
   if (main.support.storage)
   {
    if (window.sessionStorage &&
-       typeof window.sessionStorage[name] === "string")
+       typeof window.sessionStorage[key] === "string")
    {
-    return window.sessionStorage[name];
+    return window.sessionStorage[key];
    }
    if (window.localStorage &&
-       typeof window.localStorage[name] === "string")
+       typeof window.localStorage[key] === "string")
    {
-    return window.localStorage[name];
+    return window.localStorage[key];
    }
   }
-  return main.$.getCookie(name);
+  return main.$.getCookie(key);
  };
-/** @param {string} name
+/** @param {string} key
     @param {string|number|boolean} value
     @param {Date=} expiration */
 main.$.save =
- function (name, value, expiration)
+ function (key, value, expiration)
  {
   var /** @type {Storage} */ storage;
   if (main.support.storage)
   {
    storage = (!expiration && window.sessionStorage) || window.localStorage;
-   storage[name] = value;
+   storage[key] = value;
   }
   else
   {
-   main.$.setCookie(name, value, expiration);
+   main.$.setCookie(key, value, expiration);
   }
  };
 /** @param {Event} e */
@@ -629,11 +634,25 @@ main.recipientThinking = false;
 /** @type {string} */
 main.userName = "";
 /** @type {string} */
-main.normalIcon = "/favicon.ico";
+main.notificationURL = "";
 /** @type {string} */
-main.newMessageIcon = "/images/new-message-icon.ico";
+main.getTimeURL = "";
 /** @type {string} */
-main.currentIcon = main.normalIcon;
+main.removeMessageURL = "";
+/** @type {string} */
+main.fetchMoreMessagesURL = "";
+/** @type {string} */
+main.reclaimTokenURL = "";
+/** @type {string} */
+main.reportURL = "";
+/** @type {string} */
+main.signOutURL = "";
+/** @type {string} */
+main.normalIcon = "";
+/** @type {string} */
+main.newMessageIcon = "";
+/** @type {string} */
+main.currentIcon = "";
 /** @type {HTMLLinkElement} */
 main.eIcon = null;
 /** @type {Array<string>} */
@@ -649,7 +668,6 @@ main.timeSynchronization =
   serverTime: 0
  };
 
-
 main.updateSynchronizedTime =
  function ()
  {
@@ -664,7 +682,7 @@ main.updateSynchronizedTime =
    main.timeSynchronization.serverTime = server;
   }
 
-  request.open("get", "/get-time", true);
+  request.open("get", main.getTimeURL, true);
   request.timeout = 5000;
   request.onreadystatechange =
    function ()
@@ -672,7 +690,9 @@ main.updateSynchronizedTime =
     if (request.readyState === 4 && request.status === 200)
     {
      clearTimeout(timer);
-     setTime((new Date()).getTime(), main.$.parseDateString(request.responseText).getTime());
+     setTime(
+      (new Date()).getTime(),
+      main.$.parseDateString(request.responseText).getTime());
     }
    };
   timer =
@@ -697,17 +717,14 @@ main.updateIcon =
   }
   if (!main.eIcon)
   {
-   eIcon = /** @type {HTMLLinkElement} */ (main.$.id("favicon"));
-   if (!eIcon)
-   {
-    eIcon = /** @type {HTMLLinkElement} */ (main.$.createElement("link"));
-    eIcon.setAttribute("rel", "icon");
-    eIcon.setAttribute("href", main.currentIcon);
-    eIcon.setAttribute("type", "image/x-icon");
-    eIcon =
-     /** @type {HTMLLinkElement} */
-     (main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild));
-   }
+   eIcon = /** @type {HTMLLinkElement} */ (main.$.createElement("link"));
+   eIcon.setAttribute("rel", "icon");
+   eIcon.setAttribute("href", main.currentIcon);
+   eIcon.setAttribute("type", "image/x-icon");
+   eIcon =
+    /** @type {HTMLLinkElement} */
+    (main.doc.head.insertBefore(main.eIcon, main.doc.head.firstChild));
+
    main.eIcon = eIcon;
   }
   main.currentIcon =
@@ -743,17 +760,16 @@ main.scrollToBottom =
   window.scroll(0, main.body.scrollHeight);
   main.finishAnimation();
  };
-/** @param {Event|KeyboardEvent} e */
+/** @param {Event|KeyboardEvent} optionalEvent */
 main.handleGlobalShortcuts =
- function (e)
+ function (optionalEvent)
  {
   var /** @type {boolean} */ alt,
       /** @type {number} */ key,
-      /** @type {boolean} */ control;
-  if (!e)
-  {
-   e = /** @type {KeyboardEvent} */ (window.event);
-  }
+      /** @type {boolean} */ control,
+      /** @type {Event|KeyboardEvent} */ e;
+
+  e = optionalEvent || /** @type {Event|KeyboardEvent} */ (window.event);
 
   key = e.keyCode;
   alt = e.altKey;
@@ -765,7 +781,7 @@ main.handleGlobalShortcuts =
    main.toggleConcealmentMode();
   }
   // F2 toggles new message notifications.
-  // A special Nokia phone buttons toggles them as well.
+  // A special Nokia phone button toggles them as well.
   else if (key === 113 ||
            (key === 229 &&
             /** @type {KeyboardEvent} */ (e).keyIdentifier === "U+000008"))
@@ -893,10 +909,10 @@ main.updateRecipientTyping =
   /** @param {boolean=} isTyping */
   function updateTyping(isTyping)
   {
-   isTyping = isTyping || false;
-   if (main.typing !== isTyping)
+   var isTypingFinal = isTyping || false;
+   if (main.typing !== isTypingFinal)
    {
-    main.typing = isTyping;
+    main.typing = isTypingFinal;
     main.updateBodyIndicator();
    }
   }
@@ -968,12 +984,12 @@ main.updatePresenceData =
   {
    return;
   }
-  if (!main.$.whitespacePatten)
+  if (!main.$.whitespacePattern)
   {
-   main.$.whitespacePatten = new RegExp("\\n\\s\\t\\r", "g");
+   main.$.whitespacePattern = new RegExp("\\n\\s\\t\\r", "g");
   }
   if ((indicateTypingState || typedLately) &&
-      main.messageField.value.replace(main.$.whitespacePatten, ""))
+      main.messageField.value.replace(main.$.whitespacePattern, ""))
   {
    main.lastTypingIndicationTimestamp = now;
    typing = "&typing=1";
@@ -1026,9 +1042,9 @@ main.sendReport =
       parameters =
        "type=" + main.$.encode(code) + "&value=" + main.$.encode(value) +
        (main.testDatabase? "&test=1": "");
-  request.open("post", "/report", true);
+  request.open("post", main.reportURL, true);
   request.setRequestHeader(
-   "Content-Type", "application/x-www-form-urlencoded");
+   "Content-Type", main.urlEncodedMimeType);
   request.send(parameters);
  };
 /** @param {{data: Object}} message */
@@ -1180,13 +1196,13 @@ main.replaceReceptor =
            before? receptor: receptor.nextSibling));
  };
 /** @param {string|Element} htmlOrElements
-    @param {boolean=} alert */
+    @param {boolean=} isAlert */
 main.showDialog =
- function (htmlOrElements, alert)
+ function (htmlOrElements, isAlert)
  {
   main.dialog.style.display = "block";
   main.dialog.innerHTML =
-   "<h2>" + (alert? "Hey!": "We are having issues!") + "</h2>";
+   "<h2>" + (isAlert? "Hey!": "We are having issues!") + "</h2>";
   if (typeof htmlOrElements === "string")
   {
    main.dialog.innerHTML += htmlOrElements + "<h3>(Click to dismiss)</h3>";
@@ -1198,16 +1214,16 @@ main.showDialog =
   main.doc[main.$.addEventString](
    main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
-/** @param {Event|KeyboardEvent|MouseEvent=} e */
+/** @param {Event|KeyboardEvent|MouseEvent=} optionalEvent */
 main.clearDialog =
- function (e)
+ function (optionalEvent)
  {
-  var /** @type {Element} */ source;
+  var /** @type {Element} */ source,
+      /** @type {Event|KeyboardEvent|MouseEvent|undefined} */ e;
   
-  if (!e)
-  {
-   e = /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
-  }
+  e =
+   optionalEvent ||
+   /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
 
   if (e)
   {
@@ -1226,16 +1242,18 @@ main.clearDialog =
   main.doc[main.$.removeEventString](
    main.$.eventTypePrefix + "keyup", main.clearDialog, false);
  };
-/** @param {Event|KeyboardEvent|MouseEvent=} e */
+/** @param {Event|KeyboardEvent|MouseEvent=} optionalEvent */
 main.handleClicks =
- function (e)
+ function (optionalEvent)
  {
-  var /** @type {string} */ action,
-      /** @type {?Element|undefined} */ source;
-  if (!e)
-  {
-   e = /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
-  }
+  var /** @type {string|undefined} */ action,
+      /** @type {?Element|undefined} */ source,
+      /** @type {Event|KeyboardEvent|MouseEvent|undefined} */ e;
+
+  e =
+   optionalEvent ||
+   /** @type {Event|KeyboardEvent|MouseEvent} */ (window.event);
+
   source = /** @type {Element} */ (e.target || e.srcElement);
   action = source.getAttribute && source.getAttribute("data-action");
   if (!action)
@@ -1458,7 +1476,7 @@ main.reclaimToken =
    };
   request.open(
    "get",
-   "/reclaim-channel-token?from=" + main.$.encode(main.userName) +
+   main.reclaimTokenURL + "?from=" + main.$.encode(main.userName) +
    (main.testDatabase? "&test=1": ""),
    true);
   request.send(null);
@@ -1526,7 +1544,7 @@ main.hideAndFocus =
  {
   main.toggleConcealmentMode(true);
   alert("Oops! Something went wrong, please, restart the application.");
-  main.doc.location.href = "/sign-out";
+  main.doc.location.href = main.signOutURL;
  };
 /** @param {Object<string, string>|string} data */
 main.dispatchAction =
@@ -1643,22 +1661,23 @@ main.hideRedundantOutro =
 main.initialize =
  function ()
  {
-  /** @param {string} name
+  /** @param {string} key
       @returns {string} */
-  function get(name)
+  function get(key)
   {
-   return main.html.getAttribute("data-" + name);
+   return main.html.getAttribute("data-" + key);
   }
   function checkLocation()
   {
    /** @param {GeolocationPosition} position */
    function storeLocation(position)
    {
-    var /** @type {string} */
-        location = position.coords.latitude + "," + position.coords.longitude;
-    if (main.location !== location)
+    /** @type {string} */
+    var geolocation =
+         position.coords.latitude + "," + position.coords.longitude;
+    if (main.location !== geolocation)
     {
-     main.location = location;
+     main.location = geolocation;
      main.updatePresenceData();
     }
    }
@@ -1667,15 +1686,26 @@ main.initialize =
 
   // Initial time synchronization after a minute.
   setTimeout(main.updateSynchronizedTime, (MAIN_DEBUG? 5000: 60000));
-  // And then every five minute.
+  // And then every five minutes.
   setInterval(main.updateSynchronizedTime, 300000);
 
-  if (get("normal") === "1")
-  {
-   main.normalMessenger = true;
-   main.normalIcon = "/images/favicon.png";
-   main.newMessageIcon = "/images/new-message-favicon.png";
-  }
+  main.eIcon = /** @type {HTMLLinkElement} */ (main.$.id("favicon"));
+  main.normalIcon =
+   get("favicon-url") || (main.eIcon && main.eIcon.href) || "";
+  main.newMessageIcon = get("new-message-icon-url");
+  main.currentIcon = main.normalIcon;
+  main.notifications.soundURL = get("notification-mp3-url");
+  main.notificationURL = get("notification-url");
+  main.getTimeURL = get("get-time-url");
+  main.removeMessageURL = get("remove-message-url");
+  main.fetchMoreMessagesURL = get("fetch-more-messages-url");
+  main.messages.updatePresenceDataURL =
+   get("update-presence-data-url");
+  main.reclaimTokenURL = get("reclaim-token-url");
+  main.reportURL = get("report-url");
+  main.signOutURL = get("sign-out-url");
+
+  main.normalMessenger = get("normal") === "1";
 
   if (get("new-messages-mode") === "1")
   {
@@ -1749,7 +1779,7 @@ main.initialize =
    {
     var /** @type {string} */ args = "[",
         /** @type {number} */ i,
-        /** @type {number} */ length = arguments.length,
+        /** @type {number} */ argumentCount = arguments.length,
         /** @type {string|number|DOMError|DOMException} */ argument;
     //if (window.JSON)
     //{
@@ -1758,9 +1788,10 @@ main.initialize =
     //else
     //{
      /*jslint plusplus: true*/
-     for (i = 0; i < length; i++)
+     for (i = 0; i < argumentCount; i++)
      {
-      argument = /** @type {string|number|DOMError|DOMException} */ (arguments[i]);
+      argument =
+       /** @type {string|number|DOMError|DOMException} */ (arguments[i]);
      /*jslint plusplus: false*/
       try
       {
@@ -1780,7 +1811,7 @@ main.initialize =
         args += argument;
        }
       }
-      //if (i !== (length - 1))
+      //if (i !== (argumentCount - 1))
       //{
        args += ",";
       //}
@@ -1873,7 +1904,7 @@ main.support.calcValue =
    var /** @type {Element} */ element = document.createElement("div");
    element.style.cssText =
     "width: -webkit-calc(1px); height: -moz-calc(1px); padding-top: calc(1px)";
-   return !!element.style.length;
+   return element.style.length > 0;
   }());
 
 if (!main.settings)
@@ -1965,8 +1996,8 @@ main.notifications.enabled = true;
 main.notifications.notification = null;
 /** @type {Audio|HTMLAudioElement|HTMLEmbedElement} */
 main.notifications.sound = null;
-/** @const {string} */
-main.notifications.soundURL = "/resources/notification.mp3";
+/** @type {string} */
+main.notifications.soundURL = "";
 /** @type {Element} */
 main.notifications.settings = main.$.id("notification-settings");
 /** @type {Window} */
@@ -2015,11 +2046,11 @@ main.notifications.play =
    try
    {
     sound.src = url;
-    sound["volume"] =
+    sound["vol" + "ume"] =
      parseFloat(
       /** @type {HTMLInputElement} */
       (main.settings.form["sound-notification-volume"]).value) || 1;
-    sound["play"]();
+    sound["pl" + "ay"]();
    }
    catch (e)
    {
@@ -2078,7 +2109,7 @@ main.notifications.show =
    {
     main.notifications.notificationPopup =
      window.open(
-      ("/notification?from=" + main.userName +
+      (main.notificationURL + "?from=" + main.userName +
        (main.normalMessenger? "&normal=1": "")),
       "Notification",
       "width=400, height=80, left=" + (screen.availWidth - 400) + "," +
@@ -2271,7 +2302,7 @@ main.notifications.prepare =
    if (permission === "granted" ||
        // Standard API.
        (window.Notification && "permission" in Notification &&
-        Notification.permission == "granted") ||
+        Notification.permission === "granted") ||
        // Old API, for older Chrome or maybe also Safari.
        (window.webkitNotifications &&
         webkitNotifications.checkPermission() === 0))
@@ -2328,7 +2359,7 @@ main.notifications.initializeSound =
        (main.doc.createElement("audio"));
 
   if (sound.canPlayType &&
-      sound.canPlayType("audio/mp3") !== "")
+      (sound.canPlayType("audio/mp3") || sound.canPlayType("audio/mpeg")))
   {
    sound["html5"] = true;
    sound = /** @type {HTMLAudioElement} */ (main.body.appendChild(sound));
@@ -2354,7 +2385,7 @@ main.messages.checkerTimer = null;
 /** @type {?number} */
 main.messages.checkerTimeoutTimer = null;
 /** @type {string} */
-main.messages.updatePresenceDataURL = "/update-presence-data";
+main.messages.updatePresenceDataURL = "";
 /** @type {?number} */
 main.messages.glowTimer = null;
 /** @type {?XMLHttpRequest} */
@@ -2379,7 +2410,8 @@ main.messages.normalHebrewAsEnglishPattern =
   "\\b(fi|yuc|vh+|[bcdfghjklmnpqrstvwxz]{2,})\\b|[a-zA-Z],[a-zA-Z]", "g");
 /** @type {RegExp} */
 main.messages.whitelistEnglishPattern =
- new RegExp("\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(https?://|www)[^ \"]+)\\b", "gi");
+ new RegExp(
+  "\\b(h+m+|g+r+|w+t+f+|sms|mms|ll|(https?://|www)[^ \"]+)\\b", "gi");
 /** @type {RegExp} */
 main.messages.onlyHebrewLettersPattern = new RegExp("[א-ת]", "g");
 /** @type {Object.<function()>} */
@@ -2397,20 +2429,22 @@ main.messages.clearAll =
  };
 /** @param {Event} e
     @param {HTMLAnchorElement|Element|Node} dismissLink
-    @param {(Element|Node)=} message */
+    @param {!Element=} eUndeliveredMessage */
 main.messages.removeUndelivered =
- function (e, dismissLink, message)
+ function (e, dismissLink, eUndeliveredMessage)
  {
-  if (!message)
+  /** @type {Element|undefined} */
+  var eMessage = eUndeliveredMessage;
+  if (!eMessage)
   {
    main.$.preventDefault(e);
-   message = /** @type {!Element} */ (dismissLink.parentNode.parentNode);
+   eMessage = /** @type {!Element} */ (dismissLink.parentNode.parentNode);
   }
-  if (/** @type {!Element} */ (message).className.indexOf("system-message") === -1)
+  if (eMessage.className.indexOf("system-message") === -1)
   {
    return;
   }
-  message.parentNode.removeChild(message);
+  eMessage.parentNode.removeChild(eMessage);
  };
 /** @param {Event} e
     @param {HTMLAnchorElement|Element|Node} resendLink */
@@ -2514,10 +2548,10 @@ main.messages.handleMessageFieldKeyUp =
   }
   main.messages.lastTypedMessage = main.messageField.value;
  };
-/** @param {Event} e
+/** @param {Event} optionalEvent
     @return {?boolean|undefined} */
 main.messages.handleMessageFieldKeys =
- function (e)
+ function (optionalEvent)
  {
   var /** @type {HTMLTextAreaElement} */
       concealed = main.concealedMessageField,
@@ -2539,6 +2573,7 @@ main.messages.handleMessageFieldKeys =
     source.onkeypress = null;
    }
   }*/
+  var /** @type {Event} */ e = optionalEvent;
   if (!e)
   {
    e = /** @type {Event} */ (window.event);
@@ -2598,7 +2633,7 @@ main.messages.loadCannedMessageOrder =
       /** @type {Array<!HTMLOptionElement>} */ cannedMessages = [],
       /** @type {HTMLSelectElement} */ field = main.cannedMessageField,
       /** @type {number} */ i = 0,
-      /** @type {number} */ length;
+      /** @type {number} */ cannedMessageCount;
   if (!rawCannedIndices)
   {
    return;
@@ -2606,10 +2641,12 @@ main.messages.loadCannedMessageOrder =
   cannedIndices = rawCannedIndices.split(",");
   cannedMessages = /** @type {Array<!HTMLOptionElement>} */ ([]);
   /*jslint plusplus: true*/
-  for (length = cannedIndices.length; i < length; i++)
+  for (cannedMessageCount = cannedIndices.length; i < cannedMessageCount; i++)
   {
   /*jslint plusplus: false*/
-   cannedMessages.push(main.cannedMessageField.options[cannedIndices[i]]);
+   cannedMessages.push(
+    /** @type {!HTMLOptionElement} */
+    (main.cannedMessageField.options[cannedIndices[i]]));
   }
   while (cannedMessages.length)
   {
@@ -2662,12 +2699,12 @@ main.messages.saveCannedMessageOrder =
       /** @type {Array.<string>} */ cannedIndices,
       /** @type {Date} */ expiration,
       /** @type {number} */ i = 0,
-      /** @type {number} */ length,
-      /** @type {string} */ name = main.messages.cannedIndicesCookieName;
-  rawCannedIndices = main.$.load(name);
+      /** @type {number} */ cannedMessageCount,
+      /** @type {string} */ key = main.messages.cannedIndicesCookieName;
+  rawCannedIndices = main.$.load(key);
   cannedIndices = rawCannedIndices? rawCannedIndices.split(","): [];
   /*jslint plusplus: true*/
-  for (length = cannedIndices.length; i < length; i++)
+  for (cannedMessageCount = cannedIndices.length; i < cannedMessageCount; i++)
   {
   /*jslint plusplus: false*/
    if (parseInt(cannedIndices[i], 10) === parseInt(index, 10))
@@ -2679,7 +2716,7 @@ main.messages.saveCannedMessageOrder =
   rawCannedIndices = cannedIndices.join(",");
   expiration = new Date();
   expiration.setFullYear(expiration.getFullYear() + 1);
-  main.$.save(name, rawCannedIndices, expiration);
+  main.$.save(key, rawCannedIndices, expiration);
 };
 main.messages.sendManually =
  function ()
@@ -2763,16 +2800,15 @@ main.messages.send =
 
         container.id = uniqueID;
         container["originalMessage"] = message;
-        container["notify"] = !!notify;
+        container["notify"] = Boolean(notify);
         header =
          /** @type {Element} */
          (container.appendChild(
           main.$.createElement(
            "span", null,
            "The following message might have not been delievered (")));
-        element =
-         /** @type {Element} */
-         (header.appendChild(main.$.createElement("a", null, "dismiss")));
+        element = main.$.createElement("a", null, "dismiss");
+        header.appendChild(element);
         element.setAttribute("data-action", "remove-undelivered");
         element.href = "#";
         header.appendChild(main.$.createText(" or "));
@@ -2814,7 +2850,7 @@ main.messages.send =
     request = main.$.createRequest();
     request.open("post", main.messages.sendURL, true);
     request.setRequestHeader(
-     "Content-Type", "application/x-www-form-urlencoded");
+     "Content-Type", main.urlEncodedMimeType);
     request.onreadystatechange =
      function ()
      {
@@ -2917,9 +2953,9 @@ main.messages.send =
     var /** @type {HTMLButtonElement} */ defaultButton,
         /** @type {HTMLButtonElement} */ button,
         /** @type {Element} */ element,
-        /** @type {function():undefined} */ focus,
+        /** @type {function():undefined} */ focusElement,
         /** @type {Element} */ activeElement = main.doc.activeElement;
-    focus =
+    focusElement =
      function ()
      {
       if (activeElement && activeElement.tagName !== "BODY")
@@ -2943,16 +2979,15 @@ main.messages.send =
      element.appendChild(main.$.createElement("br"));
     defaultButton =
      /** @type {HTMLButtonElement} */
-     (element.appendChild(
-      /** @type {HTMLButtonElement} */
-      (main.$.createElement("button", null, "Fix & Send"))));
+     (main.$.createElement("button", null, "Fix & Send"));
+    element.appendChild(defaultButton);
     defaultButton.onclick =
      function ()
      {
       main.clearDialog();
       message = translatedMessage;
       prepareMessage();
-      focus();
+      focusElement();
      };
     button =
      /** @type {HTMLButtonElement} */
@@ -2965,7 +3000,7 @@ main.messages.send =
       main.clearDialog();
       main.sendReport("invalid-hebrew-english-detection", message);
       prepareMessage();
-      focus();
+      focusElement();
      };
     button =
      /** @type {HTMLButtonElement} */
@@ -2976,7 +3011,7 @@ main.messages.send =
      function ()
      {
       main.clearDialog();
-      focus();
+      focusElement();
      };
     main.showDialog(element, true);
     defaultButton.focus();
@@ -3034,7 +3069,8 @@ main.messages.useCannedMessage =
    return;
   }
   cannedMessage =
-   /** @type {HTMLOptionElement} */ (cannedMessageField.options[cannedMessageIndex]);
+   /** @type {HTMLOptionElement} */
+   (cannedMessageField.options[cannedMessageIndex]);
   message.value =
    cannedMessage.value + (message.value? " - " + message.value: "");
   main.messages.saveCannedMessageOrder(
@@ -3064,11 +3100,11 @@ main.messages.removeMessage =
    main.showDialog(
     "The message could not be deleted. :( Try again soon, though!");
   }
-  /** @param {string} name
+  /** @param {string} key
       @returns {string} */
-  function get(name)
+  function get(key)
   {
-   return main.$.encode(messageContainer.getAttribute("data-" + name)) || "";
+   return main.$.encode(messageContainer.getAttribute("data-" + key)) || "";
   }
 
   main.$.preventDefault(e);
@@ -3082,7 +3118,7 @@ main.messages.removeMessage =
   }
   request = main.$.createRequest();
   url =
-   "/remove-message?key=" + get("key") +
+   main.removeMessageURL + "?key=" + get("key") +
    "&sender=" + get("sender") + "&recipient=" + get("recipient") +
    (main.testDatabase? "&test=1": "") +
    "&dynamic=1";
@@ -3117,7 +3153,7 @@ main.messages.fetch =
    main.$.preventDefault(e);
   }
   request = main.$.createRequest();
-  url = "/fetch-more-messages?from=" + main.$.encode(main.userName);
+  url = main.fetchMoreMessagesURL + "?from=" + main.$.encode(main.userName);
   if (queued)
   {
    url += "&queued=1&timestamp=" + main.$.encode(main.lastMessageTimestamp);
@@ -3163,10 +3199,10 @@ main.messages.addMultipleMessages =
  function (messageList, old)
  {
   var /** @type {number} */ i = 0,
-      /** @type {number} */ length,
+      /** @type {number} */ messageCount,
       /** @type {Object<string, ?>} */ message;
   /*jslint plusplus: true*/
-  for (length = messageList.length; i < length; i++)
+  for (messageCount = messageList.length; i < messageCount; i++)
   {
   /*jslint plusplus: false*/
   /*jslint sub: true*/
@@ -3176,7 +3212,7 @@ main.messages.addMultipleMessages =
     /** @type {string} */ (message["key"]),
     /** @type {string} */ (message["accurate-timestamp"]),
     /** @type {string} */ (message["accurate-timestamp-date"]),
-    null, old, i !== length - 1);
+    null, old, i !== messageCount - 1);
   /*jslint sub: false*/
   }
  };
@@ -3380,13 +3416,13 @@ main.messages.iterateThroughMessages =
  {
   var /** @type {NodeList} */ elements,
       /** @type {number} */ i,
-      /** @type {number} */ length;
+      /** @type {number} */ messageCount;
   if (main.messages.messagePane.querySelectorAll)
   {
    elements = main.messages.messagePane.querySelectorAll(".message");
-   length = elements.length;
+   messageCount = elements.length;
    /*jslint plusplus: true*/
-   for (i = 0; i < length; i++)
+   for (i = 0; i < messageCount; i++)
    {
    /*jslint plusplus: false*/
     runAction(elements[i]);
@@ -3395,9 +3431,9 @@ main.messages.iterateThroughMessages =
   else
   {
    elements = main.$.tag("div", main.messages.messagePane);
-   length = elements.length;
+   messageCount = elements.length;
    /*jslint plusplus: true*/
-   for (i = 0; i < length; i++)
+   for (i = 0; i < messageCount; i++)
    {
    /*jslint plusplus: false*/
     if (/** @type {Element} */ (elements[i]).className === "message")
@@ -3414,16 +3450,16 @@ main.messages.findMessageByKey =
  {
   var /** @type {NodeList} */ messages,
       /** @type {number} */ i,
-      /** @type {number} */ length;
+      /** @type {number} */ messageCount;
   if (main.messages.messagePane.querySelector)
   {
    return main
            .messages.messagePane.querySelector("[data-key=\"" + key + "\"]");
   }
   messages = main.$.tag("div", main.messages.messagePane);
-  length = messages.length;
+  messageCount = messages.length;
   /*jslint plusplus: true*/
-  for (i = 0; i < length; i++)
+  for (i = 0; i < messageCount; i++)
   {
   /*jslint plusplus: false*/
    if (/** @type {Element} */ (messages[i]).getAttribute("data-key") === key)
@@ -3454,9 +3490,9 @@ main.messages.showOtherConversationNotification =
   main.otherConversations = true;
   main.updateBodyIndicator();
  };
-/** @param {Event} e */
+/** @param {Event} optionalEvent */
 main.messages.showOtherConversationDialog =
- function (e)
+ function (optionalEvent)
  {
   var /** @type {string} */
       url = main.eOtherConversations.getAttribute("data-url"),
@@ -3465,25 +3501,32 @@ main.messages.showOtherConversationDialog =
       /** @type {Array<string>} */
       conversationLinks = [],
       /** @type {Object<string, boolean>} */
-      nameMap = {},
+      senderMap = {},
       /** @type {string} */
-      name,
+      sender,
       /** @type {number} */
       i = 0,
       /** @type {number} */
-      length;
+      messageSenderCount,
+      /** @type {Event} */
+      e = optionalEvent;
+
+  if (!e)
+  {
+   e = window.event;
+  }
 
   main.$.preventDefault(e);
 
-  for (length = details.length; i < length; i++)
+  for (messageSenderCount = details.length; i < messageSenderCount; i++)
   {
-   name = details[i];
-   if (!nameMap[name])
+   sender = details[i];
+   if (!senderMap[sender])
    {
     conversationLinks.push(
-     "<a href=\"" + url.replace("$name$", name) + "\" data-keep=\"1\" " +
-     "target=\"_blank\">" + name + "</a>");
-    nameMap[name] = true;
+     "<a href=\"" + url.replace("$name$", sender) + "\" data-keep=\"1\" " +
+     "target=\"_blank\">" + sender + "</a>");
+    senderMap[sender] = true;
    }
   }
 

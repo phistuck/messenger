@@ -1,37 +1,91 @@
-#!/usr/bin/env python
-#from google.appengine.dist import use_library
-#use_library("django", "1.2")
 import os, re, time, webapp2, datetime, logging, json
 from datetime import timedelta, datetime
 
 from google.appengine.api import mail, channel, xmpp, memcache, urlfetch
 from google.appengine.runtime import apiproxy_errors
 from google.appengine.ext import db, deferred
-from google.appengine.ext.webapp import template #, util
+from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
-
 
 from messenger \
  import authentication, db_util, time_util, canned_messages, \
         internationalization, user_details
 
-def create_html_path(name):
- return os.path.join(os.path.dirname(__file__), "html/" + name)
+from messenger.constants \
+ import HOST_NAME, APPLICATION_NAME, \
+        APPLICATION_VERSION, DEV_MODE, CHANNEL_DURATION, \
+        APPLICATION_JID, APPLICATION_EMAIL_DOMAIN, \
+        NO_REPLY_EMAIL, APPLICATION_EMAIL_SENDER, \
+        TEST_MODE_CHANNEL_PREFIX, \
+        IS_PRIVATE_MESSENGER
 
-HOST_NAME = "messenger.appspot.com"
-APPLICATION_VERSION = os.environ.get("CURRENT_VERSION_ID");
-DEV_MODE = False
-if os.environ.get("SERVER_SOFTWARE").startswith("Devel"):
- DEV_MODE  = True
- HOST_NAME = "localhost:8082"
- APPLICATION_VERSION = "dev" + str(datetime.now())
+"""
+ Resource paths
+"""
+
+NOTIFICATION_MP3_PATH = "/resources/notification.mp3"
+NORMAL_NEW_MESSAGE_ICON_PATH = "/images/new-message-icon.png"
+NEW_MESSAGE_ICON_PATH = "/images/new-message-icon.ico"
+FAVICON_PATH = "/favicon.ico"
+NORMAL_FAVICON_PATH = "/images/favicon.png"
+HTML_PATH = "html/"
+CONVERSE_SCRIPT_SOURCE_PATH = 'scripts_source/converse.js'
+MINIFIED_CONVERSE_SCRIPT_PATH = 'scripts/converse.min.js'
+
+"""
+ Application paths
+"""
 SEND_MESSAGE_PATH = "/send-message"
 SEND_MESSAGE_URL = "https://" + HOST_NAME + SEND_MESSAGE_PATH
-CHANNEL_DURATION = 900
+RECLAIM_TOKEN_PATH = "/reclaim-channel-token"
+NOTIFICATION_PATH = "/notification"
+REMOVE_MESSAGE_PATH = "/remove-message"
+FETCH_MORE_MESSAGES_PATH = "/fetch-more-messages"
+GET_TIME_PATH = "/get-time"
+UPDATE_PRESENCE_DATA_PATH = "/update-presence-data"
+REPORT_PATH = "/report"
+SIGN_OUT_PATH = "/sign-out"
+STATIC_FORM_PATH = "/static-form"
+REDIRECT_TO_CONVERSE_PATH = "/redirect-to-converse"
+GET_USER_SETTINGS_PATH = "/get-user-settings"
+CONVERSE_PATH = "/converse"
 
 """
- General utility functions and classes.
+ General utility patterns, local constants classes and functions.
 """
+year_switch_pattern = re.compile("([\\d:]{8}) ([\\d]{4})")
+trailing_z_pattern = re.compile("[zZ]$")
+microsecond_dot_pattern = re.compile("\\.")
+remove_xmpp_bot_pattern = re.compile("/.*$")
+digit_only_pattern = re.compile("\\D")
+email_username_pattern = re.compile("@.+$")
+sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
+# to+UserName@messenger.appspotmail.com
+email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
+invalid_email_receiver_pattern = re.compile("[^a-zA-Z-_]")
+
+timestamp_1998 = datetime(year = 1998, month = 1, day = 1)
+timestamp_1999 = datetime(year = 1999, month = 1, day = 1)
+timestamp_2000 = datetime(year = 2000, month = 1, day = 1)
+timestamp_2001 = datetime(year = 2001, month = 1, day = 1)
+
+class MillisecondTimestamp:
+ def __init__(self, timestamp):
+  self.timestamp = timestamp
+ def __str__(self):
+  return year_switch_pattern.sub("\\2 \\1", self.timestamp.ctime()) + "." + \
+          str(self.timestamp.microsecond / 1000) + " GMT+0000"
+
+class CustomJSONEncoder(json.JSONEncoder):
+ def default(self, obj):
+  if isinstance(obj, datetime):
+   return get_javascript_datetime_string(obj)
+  elif isinstance(obj, MillisecondTimestamp):
+   return obj.__str__()
+  elif isinstance(obj, db.Model):
+   return dict((p, getattr(obj, p)) for p in obj.properties())
+  else:
+   return json.JSONEncoder.default(self, obj) 
 
 def secure(self, no_cache = False):
  if not DEV_MODE:
@@ -43,6 +97,9 @@ def secure(self, no_cache = False):
   self.response.headers["Expires"] = "-1"
  else:
   self.response.headers["Vary"] = "Accept-Encoding"
+
+def create_html_path(name):
+ return os.path.join(os.path.dirname(__file__), HTML_PATH + name)
 
 def write(self, file_name):
  write(self, file_name, {})
@@ -61,12 +118,9 @@ def get_user_readable_local_timestamp(timestamp):
 # return datetime.strptime(
 #         timestamp_string[0:-9], "%a %b %d %Y %H:%M:%S")
 
-year_switch_pattern = re.compile("([\\d:]{8}) ([\\d]{4})")
 def get_javascript_datetime_string(timestamp):
  return year_switch_pattern.sub("\\2 \\1", timestamp.ctime()) + " GMT+0000"
 
-trailing_z_pattern = re.compile("[zZ]$")
-microsecond_dot_pattern = re.compile("\\.")
 def parse_iso_timestamp(iso_timestamp):
  if "." in iso_timestamp:
   return datetime.strptime(
@@ -77,13 +131,6 @@ def parse_iso_timestamp(iso_timestamp):
 
 def parse_timestamp(timestamp):
  return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-
-class MillisecondTimestamp:
- def __init__(self, timestamp):
-  self.timestamp = timestamp
- def __str__(self):
-  return year_switch_pattern.sub("\\2 \\1", self.timestamp.ctime()) + "." + \
-          str(self.timestamp.microsecond / 1000) + " GMT+0000"
 
 def write_message(manage, message, user, recipient):
  content = message.content
@@ -113,26 +160,25 @@ def write_message(manage, message, user, recipient):
 def send_chat_message(jid, content, invite = True):
  xmpp.send_invite(jid)
  xmpp.send_message( \
-  jid, content, from_jid = "messenger@appspot.com")
+  jid, content, from_jid = APPLICATION_JID)
 
-test_mode_channel_prefix = "____test_mode____"
 def send_channel_message(test_mode, recipient, content):
  #logging.info(recipient)
  if test_mode:
-  fixed_recipient = (test_mode_channel_prefix + recipient)
+  fixed_recipient = (TEST_MODE_CHANNEL_PREFIX + recipient)
  else:
   fixed_recipient = recipient
  channel.send_message(fixed_recipient, content)
 
 def is_test_channel_recipient(recipient):
- return recipient.startswith(test_mode_channel_prefix)
+ return recipient.startswith(TEST_MODE_CHANNEL_PREFIX)
 
 def clean_test_channel_recipient(recipient):
- return recipient[len(test_mode_channel_prefix) - 1:]
+ return recipient[len(TEST_MODE_CHANNEL_PREFIX) - 1:]
 
 def send_email(
  email, subject, content,
- sender = "Messenger <no-reply@messenger.appspotmail.com>"):
+ sender = APPLICATION_EMAIL_SENDER):
  mail.send_mail(sender, email, subject, content)
 
 def notify_recipient(recipient):
@@ -152,17 +198,6 @@ def notify_recipient(recipient):
    "This is an automated message. No need to reply. " +
    "Welcome.")
   return
-
-class CustomJSONEncoder(json.JSONEncoder):
- def default(self, obj):
-  if isinstance(obj, datetime):
-   return get_javascript_datetime_string(obj)
-  elif isinstance(obj, MillisecondTimestamp):
-   return obj.__str__()
-  elif isinstance(obj, db.Model):
-   return dict((p, getattr(obj, p)) for p in obj.properties())
-  else:
-   return json.JSONEncoder.default(self, obj) 
 
 def to_json(variable, indent = DEV_MODE):
  return json.dumps(variable, cls = CustomJSONEncoder, indent = indent)
@@ -187,11 +222,6 @@ def initialize_user_data(users_data, user):
     "last-read-message-timestamp": None
    }
  return users_data[user]
-
-timestamp_1998 = datetime(year = 1998, month = 1, day = 1)
-timestamp_1999 = datetime(year = 1999, month = 1, day = 1)
-timestamp_2000 = datetime(year = 2000, month = 1, day = 1)
-timestamp_2001 = datetime(year = 2001, month = 1, day = 1)
 
 def get_set_history_data(
  data, sender, recipient, property = None, value = None):
@@ -406,6 +436,258 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
  return_object["show-messages"] = show_messages
  return return_object
 
+def is_xmpp_user_available(user, data = None):
+ (data, xmpp_users_data) = get_data("xmpp-users", {}, data = data)
+ return user in xmpp_users_data and \
+         xmpp_users_data[user]["available"] > datetime.now()
+
+def fetch_more_messages_reply(test_mode, user, return_object):
+ message_json = to_json(return_object)
+ 
+ def send():
+  send_channel_message(test_mode, user, message_json)
+
+ if len(message_json) < 32000:
+  send()
+  return
+ 
+ message_count = len(return_object["value"])
+ sent_message_count = 0
+ new_return_object = \
+  {
+   "type": return_object["type"],
+   "timestamp": return_object["timestamp"],
+   "value": return_object["value"]
+  }
+ while sent_message_count < message_count:
+  while len(message_json) > 32000:
+   if len(new_return_object["value"]) == 1:
+    # TODO - handle the case where a single
+    # message is too big for us to handle.
+    return
+   new_return_object["value"] = \
+    new_return_object["value"][1:len(new_return_object["value"])]
+   message_json = to_json(new_return_object)
+  send()
+  sent_message_count = sent_message_count + len(new_return_object["value"])
+  if not sent_message_count == message_count:
+   new_return_object["value"] = \
+    return_object["value"][0:message_count - len(new_return_object["value"])]
+
+def create_conversation_log(
+ test_mode, user, timestamp, partner = None, detailed = False,
+ include_plaintext = False, show_titles = False, ongoing = True,
+ single = True):
+ #logging.info("Creating conversation log between " + user + " and " + partner)
+ #logging.info("Looking for conversations that started after " + timestamp.ctime())
+ return_object = \
+  {
+   "log": None,
+   "plaintext-log": None,
+   "last-logged-message": None,
+   "first-logged-message": None,
+   "last-message": None
+  }
+ count = 200
+ elements = []
+ state = \
+  {
+   "last-timestamp": None,
+   "last-sender": "Anonymous",
+   "first": True,
+   "conversation-ended": False
+  }
+ def gather_messages(messages):
+  #logging.info("Gathering messages")
+  def is_ongoing(timestamp):
+   return datetime.now() - timedelta(minutes = 60) < message_timestamp
+
+  def add_conversation_title(first_timestamp):
+   elements.append(
+    {
+     "conversation": get_user_readable_local_timestamp(first_timestamp)
+    })
+
+  i = 0
+  #if len(messages):
+   #logging.info("First gathered message has the timestamp of " + messages[0].timestamp.ctime());
+  for message in messages:
+   i = i + 1
+   first = False
+   # We only log messages with content.
+   if not message.content:
+    continue
+   # Caching the message timestamp.
+   message_timestamp = message.timestamp
+   # Creating a dummy last timestamp value in order not to complicate
+   # the logic later, in case this is the first logged message.
+   if state["first"]:
+    first = True
+    # Detracting 4 minutes from the current timestamp in order to make
+    # the logic show the name and the hour of the first message.
+    state["last-timestamp"] = message_timestamp - timedelta(minutes = 4)
+    # Remembering the timestamp of the first message.
+    return_object["first-logged-message"] = message_timestamp
+    # Resetting the first message flag.
+    state["first"] = False
+   # Resetting the delay, sender and element.
+   delay = 0
+   sender = None
+   element = {}
+   # Indicating that the conversation was cleanly ended,
+   # if the message were sent an hour later than the previous one.
+   if message_timestamp - timedelta(minutes = 60) > state["last-timestamp"]:
+    if single:
+     state["conversation-ended"] = True
+     return False
+    # Adding a conversation title before the first message of the next
+    # conversation, if we should show titles.
+    elif show_titles:
+     add_conversation_title(message_timestamp)
+   # Adding a conversation title before the first message,
+   # if we should show titles.
+   if first and show_titles:
+    add_conversation_title(message_timestamp)
+
+   # Bailing if this is an ongoing conversation (one of the messages were sent
+   # within the last sixty minutes) and we do want to log such conversations.
+   if not ongoing and is_ongoing(message_timestamp):
+    return_object["last-message"] = message_timestamp
+    return False
+   # Showing a delay separator, if the previous message were sent
+   # earlier than five minutes before the current message.
+   if message_timestamp - timedelta(minutes = 5) > state["last-timestamp"]:
+    # Showing the sender after such delay, no matter who it is.
+    sender = message.sender
+    # Calculating the duration of the delay.
+    delay = int((message_timestamp - state["last-timestamp"]).seconds / 60)
+    # Adding the delay element.
+    elements.append({"delay": delay})
+   # Showing the sender, if it differs from the last message.
+   elif message.sender != state["last-sender"]:
+    sender = message.sender
+   # Setting an RTL flag, if the content starts with a Hebrew letter.
+   if internationalization.is_right_to_left_content(message.content):
+    element["rtl"] = True
+   # Caching the local timestamp
+   local_timestamp = time_util.convert_to_local_time(message_timestamp)
+   # Adding the local timestamp as a @title.
+   element["local_timestamp"] = get_user_readable_timestamp(local_timestamp)
+   # Showing the hour next to the message, if the message
+   # were sent earlier than a minute ago.
+   if not (message_timestamp - timedelta(minutes = 1) < \
+           state["last-timestamp"] and \
+           state["last-timestamp"].minute == message_timestamp.minute):
+    element["hour"] = local_timestamp.strftime("%H:%M")
+   # Hiding the hour for same minute sent messages.
+   else:
+    element["hour"] = "&#160;"
+   # Showing the sender nickname, or "me" if the sender is the target of
+   # the log, or hiding it altogether if it is the same as the last one.
+   element["sender_or_me"] = \
+    user_details.get_sender_nickname_or_me(sender, user) if sender else None
+   # Showing the content of the message.
+   element["content"] = message.content
+   # Adding the message element.
+   elements.append(element)
+   # Remembering the timestamp and sender of the message.
+   state["last-timestamp"] = message_timestamp
+   state["last-sender"] = message.sender
+  # TODO - Consolidate this duplicate code...
+  if not ongoing and is_ongoing(message_timestamp):
+   return_object["last-message"] = message_timestamp
+   return False
+  
+  return i == count
+
+ more = True
+ while more and not timestamp == state["last-timestamp"]:
+  more = \
+   gather_messages(
+    db_util.fetch_messages_for_user(
+     test_mode, user, count, timestamp, False, partner = partner,
+     last_first = False))
+  if state["last-timestamp"]:
+   timestamp = state["last-timestamp"]
+ #if state["last-timestamp"]:
+  #logging.info("state.last-timestamp - " + state["last-timestamp"].ctime());
+ #logging.info("Done gathering. Gathered " + str(len(elements)) + " messages.")
+
+ if not len(elements) or not state["last-timestamp"]:
+  if detailed:
+   return return_object
+  else:
+   return return_object["log"]
+
+ partner_nickname = \
+  user_details.users[partner]["nickname"] \
+   if partner in user_details.users else partner
+ rendered_log = \
+  template.render(
+   create_html_path("history-message.html"),
+   {
+    "elements": elements,
+    "partner": partner_nickname
+   })
+ return_object["log"] = rendered_log
+ if include_plaintext:
+  rendered_plaintext_log = \
+   template.render(
+    create_html_path("plaintext-history-message.txt"),
+    {
+     "elements": elements,
+     "partner": partner_nickname
+    })
+  return_object["plaintext-log"] = rendered_plaintext_log
+
+ if detailed:
+  return_object["last-logged-message"] = state["last-timestamp"]
+  return return_object
+ else:
+  return return_object["log"]
+
+def import_message_history_import_async(test_mode):
+   data = memcache.get("application-data") or {}
+   if not "imported-messages" in data:
+    data["imported-messages"] = 0
+   messages_to_import = []
+   response = {"content": template.render(create_html_path("history-to-import.json"), {})}
+   #logging.info("Got the response.")
+   try:
+    content = from_json(response["content"])
+    #logging.info("Parsed the response.")
+   except:
+    return
+   for message in content[u"messages"]:
+    timestamp = datetime.strptime(message[u"timestamp"], "%m/%d/%Y %I:%M:%S %p")
+    if time_util.timestamp_hour_delta(timestamp) == 3:
+     timestamp = timestamp - timedelta(hours = 1)
+    messages_to_import.append(
+     db_util.create_message(
+      test_mode, content = message[u"content"], sender = message[u"sender"],
+      recipient = message[u"recipient"], timestamp = timestamp))
+   #logging.info("Appended the messages.")
+   #logging.info(len(messages_to_import))
+   #logging.info("Saved the data.")
+   if len(messages_to_import):
+     messages_to_import = messages_to_import[data["imported-messages"] - 1:]
+     for i in range (0, 15):
+      if not len(messages_to_import):
+       break
+      messages_to_import[0].put()
+      #logging.debug("Saving a message.")
+      if messages_to_import[0].key():
+       messages_to_import.pop(0)
+       data["imported-messages"] = data["imported-messages"] + 1
+       set_data(data)
+      else:
+       break
+     if len(messages_to_import):
+      defer_import_messages(test_mode)
+
+def defer_import_messages(test_mode):
+ deferred.defer(import_message_history_import_async, test_mode, _countdown=300)
+
 """
  Page classes.
 """
@@ -413,12 +695,11 @@ def get_last_messages_for_user(test_mode, user, unlimited, data = None):
 class ConversePage(webapp2.RequestHandler):
  def get(self):
   secure(self, no_cache = True)
-  normal_mode = self.request.get("normal") == "1"
+  normal_mode = not IS_PRIVATE_MESSENGER or self.request.get("normal") == "1"
   if not normal_mode and not authentication.is_authenticated(self, DEV_MODE):
    return
   development = self.request.get("dev") == "1"
-  desktop = self.request.get("desktop") or "0"
-  mode_desktop = desktop == "1"
+  desktop = self.request.get("desktop") == "1"
   manage = self.request.get("manage") or "0"
   mode_manage = manage == "1"
   user = self.request.get("from")
@@ -449,6 +730,11 @@ class ConversePage(webapp2.RequestHandler):
    return rendered_messages
   messages = render_messages(fetched_messages, True)
   unread_messages = render_messages(fetched_unread_messages, False)
+  
+  converse_script_path = \
+   "%s?%s" % (CONVERSE_SCRIPT_SOURCE_PATH, APPLICATION_VERSION) \
+    if development else MINIFIED_CONVERSE_SCRIPT_PATH
+  
   variables = {}
   variables["user"] = user
   variables["to"] = recipient
@@ -457,31 +743,48 @@ class ConversePage(webapp2.RequestHandler):
   variables["manage"] = manage
   variables["messages"] = messages
   variables["dev_mode"] = DEV_MODE
-  variables["desktop"] = desktop
-  variables["desktop_mode"] = mode_desktop
+  variables["desktop_mode"] = desktop
   variables["new_messages_mode"] = len(unread_messages) > 0
   variables["unread_messages"] = unread_messages
   variables["development"] = development
   variables["normal"] = normal_mode
+  variables["title"] = APPLICATION_NAME
+  variables["converse_script_url"] = converse_script_path
   try:
    variables["channel_name"] = \
     channel.create_channel(
-     user if not test_mode else test_mode_channel_prefix + user,
+     user if not test_mode else TEST_MODE_CHANNEL_PREFIX + user,
      duration_minutes = CHANNEL_DURATION)
   except apiproxy_errors.OverQuotaError:
    variables["channel_name"] = ""
-  variables["canned_messages"] = canned_messages.list;
-  variables["application_version"] = APPLICATION_VERSION;
+  variables["canned_messages"] = canned_messages.list
+  variables["application_version"] = APPLICATION_VERSION
   variables["first_message_timestamp"] = message_timestamp_offsets["first"]
   variables["last_message_timestamp"] = message_timestamp_offsets["last"]
   variables["windows"] = user_details.is_windows(self.request.headers)
+  variables["send_message_url"] = SEND_MESSAGE_PATH
+  variables["reclaim_token_url"] = RECLAIM_TOKEN_PATH
+  variables["notification_url"] = NOTIFICATION_PATH
+  variables["remove_message_url"] = REMOVE_MESSAGE_PATH
+  variables["fetch_more_messages_url"] = FETCH_MORE_MESSAGES_PATH
+  variables["get_time_url"] = GET_TIME_PATH
+  variables["update_presence_data_url"] = UPDATE_PRESENCE_DATA_PATH
+  variables["report_url"] = REPORT_PATH
+  variables["sign_out_url"] = SIGN_OUT_PATH
+  variables["converse_url"] = CONVERSE_PATH
+  variables["static_form_url"] = STATIC_FORM_PATH
+  variables["notification_mp3_url"] = NOTIFICATION_MP3_PATH
+  variables["new_message_icon_url"] = \
+   NORMAL_NEW_MESSAGE_ICON_PATH if normal_mode else NEW_MESSAGE_ICON_PATH
+  variables["favicon_url"] = \
+   NORMAL_FAVICON_PATH if normal_mode else FAVICON_PATH
   write(self, "converse.html", variables)
 
 class SignOutPage(webapp2.RequestHandler):
  def get(self):
   secure(self, no_cache = True)
   self.response.headers["Set-Cookie"] = "authenticated=0"
-  self.redirect("/redirect-to-converse")
+  self.redirect(REDIRECT_TO_CONVERSE_PATH)
 
 class SendMessagePage(webapp2.RequestHandler):
  def post(self):
@@ -540,7 +843,7 @@ class ReclaimChannelTokenPage(webapp2.RequestHandler):
   secure(self)
   user = self.request.get("from")
   if self.request.get("test") == "1":
-   user = test_mode_channel_prefix + user
+   user = TEST_MODE_CHANNEL_PREFIX + user
   try:
    self.response.write(
     channel.create_channel(user, duration_minutes = CHANNEL_DURATION))
@@ -566,13 +869,6 @@ class RemoveMessagePage(webapp2.RequestHandler):
   send_channel_message(test_mode, sender, message_json)
   send_channel_message(test_mode, recipient, message_json)
 
-def is_xmpp_user_available(user, data = None):
- (data, xmpp_users_data) = get_data("xmpp-users", {}, data = data)
- return user in xmpp_users_data and \
-         xmpp_users_data[user]["available"] > datetime.now()
-
-remove_xmpp_bot_pattern = re.compile("/.*$")
-digit_only_pattern = re.compile("\\D")
 class HandleIncomingXMPPStanzas(webapp2.RequestHandler):
  def post(self):
   message = xmpp.Message(self.request.POST)
@@ -753,39 +1049,6 @@ class UpdatePresenceDataPage(webapp2.RequestHandler):
    last_read_message_timestamp = last_read_message_timestamp,
    thinking = self.request.get("thinking") == "1")
 
-def fetch_more_messages_reply(test_mode, user, return_object):
- message_json = to_json(return_object)
- 
- def send():
-  send_channel_message(test_mode, user, message_json)
-
- if len(message_json) < 32000:
-  send()
-  return
- 
- message_count = len(return_object["value"])
- sent_message_count = 0
- new_return_object = \
-  {
-   "type": return_object["type"],
-   "timestamp": return_object["timestamp"],
-   "value": return_object["value"]
-  }
- while sent_message_count < message_count:
-  while len(message_json) > 32000:
-   if len(new_return_object["value"]) == 1:
-    # TODO - handle the case where a single
-    # message is too big for us to handle.
-    return
-   new_return_object["value"] = \
-    new_return_object["value"][1:len(new_return_object["value"])]
-   message_json = to_json(new_return_object)
-  send()
-  sent_message_count = sent_message_count + len(new_return_object["value"])
-  if not sent_message_count == message_count:
-   new_return_object["value"] = \
-    return_object["value"][0:message_count - len(new_return_object["value"])]
-
 class FetchMoreMessagesPage(webapp2.RequestHandler):
  def get(self):
   secure(self)
@@ -824,178 +1087,6 @@ class FetchMoreMessagesPage(webapp2.RequestHandler):
   return_object["value"] = messages_to_send
   deferred.defer(fetch_more_messages_reply, test_mode, user, return_object)
 
-def create_conversation_log(
- test_mode, user, timestamp, partner = None, detailed = False,
- include_plaintext = False, show_titles = False, ongoing = True,
- single = True):
- #logging.info("Creating conversation log between " + user + " and " + partner)
- #logging.info("Looking for conversations that started after " + timestamp.ctime())
- return_object = \
-  {
-   "log": None,
-   "plaintext-log": None,
-   "last-logged-message": None,
-   "first-logged-message": None,
-   "last-message": None
-  }
- count = 200
- elements = []
- state = \
-  {
-   "last-timestamp": None,
-   "last-sender": "Anonymous",
-   "first": True,
-   "conversation-ended": False
-  }
- def gather_messages(messages):
-  #logging.info("Gathering messages")
-  def is_ongoing(timestamp):
-   return datetime.now() - timedelta(minutes = 60) < message_timestamp
-
-  def add_conversation_title(first_timestamp):
-   elements.append(
-    {
-     "conversation": get_user_readable_local_timestamp(first_timestamp)
-    })
-
-  i = 0
-  #if len(messages):
-   #logging.info("First gathered message has the timestamp of " + messages[0].timestamp.ctime());
-  for message in messages:
-   i = i + 1
-   first = False
-   # We only log messages with content.
-   if not message.content:
-    continue
-   # Caching the message timestamp.
-   message_timestamp = message.timestamp
-   # Creating a dummy last timestamp value in order not to complicate
-   # the logic later, in case this is the first logged message.
-   if state["first"]:
-    first = True
-    # Detracting 4 minutes from the current timestamp in order to make
-    # the logic show the name and the hour of the first message.
-    state["last-timestamp"] = message_timestamp - timedelta(minutes = 4)
-    # Remembering the timestamp of the first message.
-    return_object["first-logged-message"] = message_timestamp
-    # Resetting the first message flag.
-    state["first"] = False
-   # Resetting the delay, sender and element.
-   delay = 0
-   sender = None
-   element = {}
-   # Indicating that the conversation was cleanly ended,
-   # if the message were sent an hour later than the previous one.
-   if message_timestamp - timedelta(minutes = 60) > state["last-timestamp"]:
-    if single:
-     state["conversation-ended"] = True
-     return False
-    # Adding a conversation title before the first message of the next
-    # conversation, if we should show titles.
-    elif show_titles:
-     add_conversation_title(message_timestamp)
-   # Adding a conversation title before the first message,
-   # if we should show titles.
-   if first and show_titles:
-    add_conversation_title(message_timestamp)
-
-   # Bailing if this is an ongoing conversation (one of the messages were sent
-   # within the last sixty minutes) and we do want to log such conversations.
-   if not ongoing and is_ongoing(message_timestamp):
-    return_object["last-message"] = message_timestamp
-    return False
-   # Showing a delay separator, if the previous message were sent
-   # earlier than five minutes before the current message.
-   if message_timestamp - timedelta(minutes = 5) > state["last-timestamp"]:
-    # Showing the sender after such delay, no matter who it is.
-    sender = message.sender
-    # Calculating the duration of the delay.
-    delay = int((message_timestamp - state["last-timestamp"]).seconds / 60)
-    # Adding the delay element.
-    elements.append({"delay": delay})
-   # Showing the sender, if it differs from the last message.
-   elif message.sender != state["last-sender"]:
-    sender = message.sender
-   # Setting an RTL flag, if the content starts with a Hebrew letter.
-   if internationalization.is_right_to_left_content(message.content):
-    element["rtl"] = True
-   # Caching the local timestamp
-   local_timestamp = time_util.convert_to_local_time(message_timestamp)
-   # Adding the local timestamp as a @title.
-   element["local_timestamp"] = get_user_readable_timestamp(local_timestamp)
-   # Showing the hour next to the message, if the message
-   # were sent earlier than a minute ago.
-   if not (message_timestamp - timedelta(minutes = 1) < \
-           state["last-timestamp"] and \
-           state["last-timestamp"].minute == message_timestamp.minute):
-    element["hour"] = local_timestamp.strftime("%H:%M")
-   # Hiding the hour for same minute sent messages.
-   else:
-    element["hour"] = "&#160;"
-   # Showing the sender nickname, or "me" if the sender is the target of
-   # the log, or hiding it altogether if it is the same as the last one.
-   element["sender_or_me"] = \
-    user_details.get_sender_nickname_or_me(sender, user) if sender else None
-   # Showing the content of the message.
-   element["content"] = message.content
-   # Adding the message element.
-   elements.append(element)
-   # Remembering the timestamp and sender of the message.
-   state["last-timestamp"] = message_timestamp
-   state["last-sender"] = message.sender
-  # TODO - Consolidate this duplicate code...
-  if not ongoing and is_ongoing(message_timestamp):
-   return_object["last-message"] = message_timestamp
-   return False
-  
-  return i == count
-
- more = True
- while more and not timestamp == state["last-timestamp"]:
-  more = \
-   gather_messages(
-    db_util.fetch_messages_for_user(
-     test_mode, user, count, timestamp, False, partner = partner,
-     last_first = False))
-  if state["last-timestamp"]:
-   timestamp = state["last-timestamp"]
- #if state["last-timestamp"]:
-  #logging.info("state.last-timestamp - " + state["last-timestamp"].ctime());
- #logging.info("Done gathering. Gathered " + str(len(elements)) + " messages.")
-
- if not len(elements) or not state["last-timestamp"]:
-  if detailed:
-   return return_object
-  else:
-   return return_object["log"]
-
- partner_nickname = \
-  user_details.users[partner]["nickname"] \
-   if partner in user_details.users else partner
- rendered_log = \
-  template.render(
-   create_html_path("history-message.html"),
-   {
-    "elements": elements,
-    "partner": partner_nickname
-   })
- return_object["log"] = rendered_log
- if include_plaintext:
-  rendered_plaintext_log = \
-   template.render(
-    create_html_path("plaintext-history-message.txt"),
-    {
-     "elements": elements,
-     "partner": partner_nickname
-    })
-  return_object["plaintext-log"] = rendered_plaintext_log
-
- if detailed:
-  return_object["last-logged-message"] = state["last-timestamp"]
-  return return_object
- else:
-  return return_object["log"]
-
 class MessageHistoryPage(webapp2.RequestHandler):
  def get(self):
   secure(self)
@@ -1011,7 +1102,6 @@ class MessageHistoryPage(webapp2.RequestHandler):
     test_mode, user, timestamp, partner = partner, single = False,
     show_titles = True))
 
-email_username_pattern = re.compile("@.+$")
 class SendConversationHistoryPage(webapp2.RequestHandler):
  def get(self):
   """ This will do something nice soon. """
@@ -1076,7 +1166,7 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
      email.sender = \
       user_details.users[partner]["nickname"] + " <" + \
       email_username_pattern.sub("", user_details.users[partner]["email"]) + \
-      "@messenger.appspotmail.com>"
+      "@" + APPLICATION_EMAIL_DOMAIN + ">"
      email.subject = \
       "Conversation with " + partner_nickname + " (" + \
        get_user_readable_local_timestamp(
@@ -1104,48 +1194,6 @@ class SendConversationHistoryPage(webapp2.RequestHandler):
      history_data[user][partner]["previous-last-message"] = \
       history_data[user][partner]["last-message"]
      set_data(data)
-
-def import_message_history_import_async(test_mode):
-   data = memcache.get("application-data") or {}
-   if not "imported-messages" in data:
-    data["imported-messages"] = 0
-   messages_to_import = []
-   response = {"content": template.render(create_html_path("history-to-import.json"), {})}
-   #logging.info("Got the response.")
-   try:
-    content = from_json(response["content"])
-    #logging.info("Parsed the response.")
-   except:
-    return
-   for message in content[u"messages"]:
-    timestamp = datetime.strptime(message[u"timestamp"], "%m/%d/%Y %I:%M:%S %p")
-    if time_util.timestamp_hour_delta(timestamp) == 3:
-     timestamp = timestamp - timedelta(hours = 1)
-    messages_to_import.append(
-     db_util.create_message(
-      test_mode, content = message[u"content"], sender = message[u"sender"],
-      recipient = message[u"recipient"], timestamp = timestamp))
-   #logging.info("Appended the messages.")
-   #logging.info(len(messages_to_import))
-   #logging.info("Saved the data.")
-   if len(messages_to_import):
-     messages_to_import = messages_to_import[data["imported-messages"] - 1:]
-     for i in range (0, 15):
-      if not len(messages_to_import):
-       break
-      messages_to_import[0].put()
-      #logging.debug("Saving a message.")
-      if messages_to_import[0].key():
-       messages_to_import.pop(0)
-       data["imported-messages"] = data["imported-messages"] + 1
-       set_data(data)
-      else:
-       break
-     if len(messages_to_import):
-      defer_import_messages(test_mode)
-
-def defer_import_messages(test_mode):
- deferred.defer(import_message_history_import_async, test_mode, _countdown=300)
 
 class ImportMessageHistory(webapp2.RequestHandler):
  def get(self):
@@ -1197,11 +1245,6 @@ class GetTimePage(webapp2.RequestHandler):
  def get(self):
   self.response.write(MillisecondTimestamp(datetime.now()));
 
-
-sender_email_pattern = re.compile("^(.*<|)([^>]+)(>*)")
-# to+UserName@messenger.appspotmail.com
-email_receiver_pattern = re.compile("^.*to\\+([^@]+)@.*$")
-invalid_email_receiver_pattern = re.compile("[^a-zA-Z-_]")
 class ProcessMailPage(InboundMailHandler):
  def receive(self, message):
   sender = sender_email_pattern.sub("\\2", message.sender)
@@ -1239,14 +1282,57 @@ class SendCommandPage(webapp2.RequestHandler):
       "value": command
      }))
 
+class RestoreMessages(webapp2.RequestHandler):
+ def post(self):
+  from google.appengine.api import users
+  if users.is_current_user_admin() and self.request.get('remove-everything') != '1':
+   return
+  everything = db_util.MessageDatabase().all().fetch(100000)
+  for entry in everything:
+   entry.delete()
+  for message_entry in json.loads(self.request.get("messages")):
+   # Some optional manipulation
+   sender = "foo" if message_entry["sender"] == "me" else "baz"
+   recipient = "baz" if message_entry["sender"] == "me" else "foo"
+   message = db_util.MessageDatabase()
+   message.timestamp = datetime.strptime(message_entry["timestamp"], "%Y-%m-%d %H:%M:%S") - timedelta(hours=2)
+   message.sender = sender
+   message.recipient = recipient
+   message.content = message_entry["content"]
+   message.notified = False
+   message.put()
+
+class GetUserSettings(webapp2.RequestHandler):
+ def post(self):
+  user = self.request.get("user")
+  if not user in user_details.users:
+   self.response.set_status(206)
+   return
+  self.response.write(to_json(user_details.users[user]))
+
+class RedirectToConversePage(webapp2.RequestHandler):
+ def get(self):
+  variables = \
+   { \
+   	'converse_url': CONVERSE_PATH,
+   	'dev': self.request.get('dev') == "1",
+   	'desktop': self.request.get('desktop') == "1",
+   	'favicon_url': '' if IS_PRIVATE_MESSENGER else NORMAL_FAVICON_PATH
+   }
+  write(self, 'redirect-to-converse.html', variables)
+
+class HomePage(webapp2.RequestHandler):
+ def get(self):
+  write(self, 'homepage.html', {})
+
 #def main():
 handleList = \
  [
-  ("/converse", ConversePage),
-  ("/sign-out", SignOutPage),
+  (CONVERSE_PATH, ConversePage),
+  (SIGN_OUT_PATH, SignOutPage),
   (SEND_MESSAGE_PATH, SendMessagePage),
-  ("/reclaim-channel-token", ReclaimChannelTokenPage),
-  ("/remove-message", RemoveMessagePage),
+  (RECLAIM_TOKEN_PATH, ReclaimChannelTokenPage),
+  (REMOVE_MESSAGE_PATH, RemoveMessagePage),
   ("/_ah/xmpp/message/chat/", HandleIncomingXMPPStanzas),
   ("/_ah/xmpp/presence/available/", HandleXMPPPresence),
   ("/_ah/xmpp/presence/unavailable/", HandleXMPPPresence),
@@ -1258,19 +1344,24 @@ handleList = \
   ("/_ah/channel/connected/", HandleChannelConnections),
   ("/_ah/channel/disconnected/", HandleChannelDisconnections),
   ("/dispatch-notification-action", DispatchNotificationActionPage),
-  ("/update-presence-data", UpdatePresenceDataPage),
-  ("/fetch-more-messages", FetchMoreMessagesPage),
+  (UPDATE_PRESENCE_DATA_PATH, UpdatePresenceDataPage),
+  (FETCH_MORE_MESSAGES_PATH, FetchMoreMessagesPage),
   ("/show-message-history", MessageHistoryPage),
   ("/send-conversation-history", SendConversationHistoryPage),
   ("/import-now", ImportMessageHistory),
   ("/print-memcache", PrintMemcachePage),
-  ("/static-form", StaticFormPage),
-  ("/report", ReportPage),
+  (STATIC_FORM_PATH, StaticFormPage),
+  (REPORT_PATH, ReportPage),
   ("/view-reports", ViewReportsPage),
   ("/add-message", AddMessagePage),
-  ("/get-time", GetTimePage),
+  (GET_TIME_PATH, GetTimePage),
+  ("/restore", RestoreMessages),
+  (GET_USER_SETTINGS_PATH, GetUserSettings),
+  (REDIRECT_TO_CONVERSE_PATH, RedirectToConversePage),
+  ("/", HomePage if IS_PRIVATE_MESSENGER else RedirectToConversePage),
   ProcessMailPage.mapping()
  ]
+
 
 if DEV_MODE:
  handleList.append(("/send-command", SendCommandPage))

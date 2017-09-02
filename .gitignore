@@ -1,11 +1,10 @@
+appengine-generated/
 *.pyc
 *.pyo
 .svn
 *.exe
 *.pem
 compiler.jar
-build_scripts/generated
-converse.min.js
-converse.previous.js
-converse.map.js
+build_scripts/generated/
+scripts/
 messenger/configuration.py
