@@ -11,6 +11,8 @@ Or, on any platform with the Google App Engine SDK installed -
 python dev_appserver.py .
 ```
 
+And then go to `localhost:8080/redirect-to-converse`. You can use `foo` or `baz` as the user name and be sure to read the comment in `messenger/authentication.py` first (alternatively, set IS_PRIVATE_MESSENGER to False in `messenger/constants.py` or in your `messenger/configuration.py` - see the Customization Options section below).
+
 ## History
 It was built due to the huge disappointment I had with Google Talk/GMail Chat/any other name Google picked at the time, because Google Talk was not reliable - I missed messages that were sent to me, others missed messages I sent to them and sometimes messages did not even reach the server and the sender was not notified about that fact.
 
