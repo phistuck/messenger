@@ -34,13 +34,17 @@ CUSTOM_DEV_HOST_NAME = 'localhost:8080'
 CUSTOM_APPLICATION_ID = 'messenger'
 CUSTOM_APPLICATION_EMAIL_DOMAIN = "%s.appspotmail.com" % CUSTOM_APPLICATION_ID
 CUSTOM_APPLICATION_VERSION = os.environ.get('CURRENT_VERSION_ID');
-CUSTOM_TEST_MODE_CHANNEL_PREFIX = "____test_mode____"
+CUSTOM_TEST_MODE_CHANNEL_PREFIX = '____test_mode____'
 CUSTOM_IS_PRIVATE_MESSENGER = False
 CUSTOM_DEV_MODE = True
 CUSTOM_APPLICATION_NAME = 'Messenger'
 CUSTOM_PRIVATE_APPLICATION_NAME = 'Blank'
 CUSTOM_USER_LIST = None
 ```
+
+## Security
+The client and the server are not secure (other than HTTPS).
+While SQL injection are probably not possible (simply because SQL is not used), you can absolutely inject scripts into messages and any HTML is accepted.
 
 ## License
 ### Code
